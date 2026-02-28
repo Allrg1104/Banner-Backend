@@ -1,0 +1,37 @@
+﻿Ô£à Base de datos inicializada correctamente
+--- STATS RESULTS ---
+{
+  "total_users": 12,
+  "total_students": 5,
+  "total_teachers": 2,
+  "total_enrollments": 11,
+  "active_users": 12
+}
+--- USER SAMPLE ---
+[
+  {
+    "id": 1,
+    "username": "santiago.espinosa01",
+    "rol": "estudiante"
+  },
+  {
+    "id": 2,
+    "username": "valentina.garcia02",
+    "rol": "estudiante"
+  },
+  {
+    "id": 3,
+    "username": "juan.martinez03",
+    "rol": "estudiante"
+  },
+  {
+    "id": 4,
+    "username": "daniela.rodriguez04",
+    "rol": "estudiante"
+  },
+  {
+    "id": 5,
+    "username": "carlos.herrera05",
+    "rol": "estudiante"
+  }
+]

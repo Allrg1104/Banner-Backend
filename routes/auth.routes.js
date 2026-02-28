@@ -1,0 +1,111 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const { getDB } = require('../database/db');
+const { sendPasswordResetEmail } = require('../services/email.service');
+const auth = require('../middleware/auth');
+
+/**
+ * POST /api/auth/login
+ */
+router.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Username y password requeridos' });
+
+    const db = getDB();
+    console.log(`[AUTH] Login attempt for: "${username}"`);
+
+    const user = db.prepare('SELECT * FROM personas WHERE username = ? OR email = ?').get(username, username);
+
+    if (!user) {
+        console.log(`[AUTH] User NOT found for: "${username}"`);
+        return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    console.log(`[AUTH] User found: ${user.username}, Active: ${user.activo}`);
+
+    if (!user.activo) {
+        return res.status(401).json({ error: 'Usuario inactivo' });
+    }
+
+    const valid = bcrypt.compareSync(password, user.password_hash);
+    console.log(`[AUTH] Password valid: ${valid}`);
+
+    if (!valid) {
+        return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const token = jwt.sign(
+        { id: user.id, username: user.username, rol: user.rol },
+        process.env.JWT_SECRET || 'secret_dev',
+        { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    );
+
+    res.json({
+        token,
+        user: {
+            id: user.id,
+            nombres: user.nombres,
+            apellidos: user.apellidos,
+            username: user.username,
+            email: user.email,
+            rol: user.rol,
+            must_change_password: !!user.must_change_password
+        }
+    });
+});
+
+/**
+ * POST /api/auth/request-password-change
+ * Inicia flujo de cambio de contraseña con confirmación por email
+ */
+router.post('/request-password-change', auth, async (req, res) => {
+    const db = getDB();
+    const user = db.prepare('SELECT id, email, nombres FROM personas WHERE id = ?').get(req.user.id);
+
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 15 * 60000).toISOString(); // 15 min
+
+    db.prepare(`
+    INSERT INTO password_resets (user_id, token, expires_at)
+    VALUES (?, ?, ?)
+  `).run(user.id, token, expiresAt);
+
+    try {
+        await sendPasswordResetEmail(user.email, user.nombres, token);
+        res.json({ message: 'Se ha enviado un correo de confirmación' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error enviando el correo' });
+    }
+});
+
+/**
+ * POST /api/auth/confirm-password-change
+ */
+router.post('/confirm-password-change', async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: 'Token y nueva contraseña requeridos' });
+
+    const db = getDB();
+    const reset = db.prepare('SELECT * FROM password_resets WHERE token = ? AND used = 0').get(token);
+
+    if (!reset || new Date(reset.expires_at) < new Date()) {
+        return res.status(400).json({ error: 'Token inválido o expirado' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+
+    db.transaction(() => {
+        db.prepare('UPDATE personas SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hashedPassword, reset.user_id);
+        db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(reset.id);
+    })();
+
+    res.json({ message: 'Contraseña actualizada correctamente' });
+});
+
+module.exports = router;
