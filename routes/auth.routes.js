@@ -108,4 +108,26 @@ router.post('/confirm-password-change', async (req, res) => {
     res.json({ message: 'Contraseña actualizada correctamente' });
 });
 
+/**
+ * POST /api/auth/change-password
+ * Direct change for authenticated users
+ */
+router.post('/change-password', auth, async (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+    }
+
+    const db = getDB();
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+
+    try {
+        db.prepare('UPDATE personas SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hashedPassword, req.user.id);
+        res.json({ message: 'Contraseña actualizada correctamente' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar la contraseña' });
+    }
+});
+
 module.exports = router;

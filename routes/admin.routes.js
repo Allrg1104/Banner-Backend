@@ -17,13 +17,13 @@ router.get('/users', auth, rbac('admin'), (req, res) => {
     const { search } = req.query;
     const db = getDB();
 
-    let query = 'SELECT id, nombres, apellidos, email, username, rol, documento, activo FROM personas';
-    let params = [];
+    let query = 'SELECT id, nombres, apellidos, email, username, rol, documento, activo, telefono, fecha_nacimiento, tipo_documento, metadata FROM personas';
+    const params = [];
 
     if (search) {
         query += ' WHERE nombres LIKE ? OR apellidos LIKE ? OR documento LIKE ? OR username LIKE ?';
         const searchTerm = `%${search}%`;
-        params = [searchTerm, searchTerm, searchTerm, searchTerm];
+        params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     query += ' ORDER BY id DESC LIMIT 200';
@@ -41,7 +41,10 @@ router.get('/users', auth, rbac('admin'), (req, res) => {
  * Create a new user
  */
 router.post('/users', auth, rbac('admin'), (req, res) => {
-    const { nombres, apellidos, email, username, password, rol, documento } = req.body;
+    const {
+        nombres, apellidos, email, username, password, rol,
+        documento, tipo_documento, telefono, fecha_nacimiento, metadata
+    } = req.body;
 
     if (!nombres || !email || !username || !password || !rol) {
         return res.status(400).json({ error: 'Faltan campos obligatorios' });
@@ -49,12 +52,19 @@ router.post('/users', auth, rbac('admin'), (req, res) => {
 
     const db = getDB();
     const password_hash = bcrypt.hashSync(password, 10);
+    const metaString = metadata ? JSON.stringify(metadata) : '{}';
 
     try {
         const result = db.prepare(`
-            INSERT INTO personas (nombres, apellidos, email, username, password_hash, rol, documento, must_change_password)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-        `).run(nombres, apellidos, email, username, password_hash, rol, documento);
+            INSERT INTO personas (
+                nombres, apellidos, email, username, password_hash, rol, 
+                documento, tipo_documento, telefono, fecha_nacimiento, metadata, must_change_password
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `).run(
+            nombres, apellidos, email, username, password_hash, rol,
+            documento, tipo_documento || 'CC', telefono, fecha_nacimiento, metaString
+        );
 
         res.status(201).json({ id: result.lastInsertRowid, message: 'Usuario creado exitosamente' });
     } catch (err) {
@@ -68,7 +78,10 @@ router.post('/users', auth, rbac('admin'), (req, res) => {
  */
 router.put('/users/:id', auth, rbac('admin'), (req, res) => {
     const { id } = req.params;
-    const { nombres, apellidos, email, rol, documento, activo } = req.body;
+    const {
+        nombres, apellidos, email, rol, documento, tipo_documento,
+        telefono, fecha_nacimiento, activo, metadata
+    } = req.body;
     const db = getDB();
 
     try {
@@ -78,11 +91,19 @@ router.put('/users/:id', auth, rbac('admin'), (req, res) => {
             return res.status(400).json({ error: 'No se puede deshabilitar el usuario administrador maestro (admin.ti)' });
         }
 
+        const metaString = metadata ? JSON.stringify(metadata) : '{}';
+
         db.prepare(`
             UPDATE personas 
-            SET nombres = ?, apellidos = ?, email = ?, rol = ?, documento = ?, activo = ?, updated_at = datetime('now')
+            SET nombres = ?, apellidos = ?, email = ?, rol = ?, documento = ?, 
+                tipo_documento = ?, telefono = ?, fecha_nacimiento = ?, 
+                activo = ?, metadata = ?, updated_at = datetime('now')
             WHERE id = ?
-        `).run(nombres, apellidos, email, rol, documento, activo ? 1 : 0, id);
+        `).run(
+            nombres, apellidos, email, rol, documento,
+            tipo_documento, telefono, fecha_nacimiento,
+            activo ? 1 : 0, metaString, id
+        );
 
         res.json({ message: 'Usuario actualizado exitosamente' });
     } catch (err) {

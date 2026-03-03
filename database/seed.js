@@ -12,6 +12,16 @@ async function seed() {
   await initDB();
   const db = getDB();
 
+  // Check if we already have users
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM personas').get().count;
+  const force = process.argv.includes('--force');
+
+  if (userCount > 0 && !force) {
+    console.log(`⚠️ La base de datos ya tiene ${userCount} usuarios. Saltando seed para evitar pérdida de datos.`);
+    console.log('💡 Usa "npm run seed -- --force" si realmente quieres resetear todo.');
+    return;
+  }
+
   console.log('🌱 Iniciando seed de datos...');
 
   // ─── PERÍODOS ────────────────────────────────────────────────────────────────
@@ -40,7 +50,7 @@ async function seed() {
     // Estudiantes
     {
       nombres: 'Santiago',
-      apellidos: 'Espinosa Ruiz',
+      apellidos: 'Espinosa Ortiz',
       email: 'santiago.espinosa01@unicatolica.edu.co',
       username: 'santiago.espinosa01',
       password: hash('Temp2024!'),
