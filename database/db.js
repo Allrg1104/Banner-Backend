@@ -307,6 +307,13 @@ async function initDB() {
     try { db._db.run(stmt + ';'); } catch (e) { /* ignore existing table errors */ }
   }
 
+  // Migración manual para columnas añadidas recientemente
+  try {
+    db._db.run("ALTER TABLE personas ADD COLUMN metadata TEXT DEFAULT '{}';");
+  } catch (e) {
+    // Ignorar si la columna ya existe
+  }
+
   db.save();
   console.log('✅ Base de datos inicializada correctamente');
   return db;
