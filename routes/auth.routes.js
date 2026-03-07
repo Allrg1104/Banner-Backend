@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const cryptoJS = require('crypto-js');
 const { getDB } = require('../database/db');
 const { sendPasswordResetEmail } = require('../services/email.service');
 const auth = require('../middleware/auth');
@@ -11,7 +12,21 @@ const auth = require('../middleware/auth');
  * POST /api/auth/login
  */
 router.post('/login', (req, res) => {
-    const { username, password } = req.body;
+    let { username, password, data } = req.body;
+
+    // Decriptar si viene encriptado
+    if (data) {
+        try {
+            const secret = 'banner-secret-key-2024';
+            const bytes = cryptoJS.AES.decrypt(data, secret);
+            const decryptedData = JSON.parse(bytes.toString(cryptoJS.enc.Utf8));
+            username = decryptedData.username;
+            password = decryptedData.password;
+        } catch (e) {
+            return res.status(400).json({ error: 'Payload de datos corrupto o inválido' });
+        }
+    }
+
     if (!username || !password) return res.status(400).json({ error: 'Username y password requeridos' });
 
     const db = getDB();
