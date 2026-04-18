@@ -91,7 +91,8 @@ router.post('/request-password-change', auth, async (req, res) => {
   `).run(user.id, token, expiresAt);
 
     try {
-        await sendPasswordResetEmail(user.email, user.nombres, token);
+        const link = `https://app.unicatolica.online/#/reset-password?token=${token}`;
+        await sendPasswordResetEmail(user.email, user.nombres, link);
         res.json({ message: 'Se ha enviado un correo de confirmación' });
     } catch (err) {
         console.error(err);
@@ -143,6 +144,35 @@ router.post('/change-password', auth, async (req, res) => {
         console.error(err);
         res.status(500).json({ error: 'Error al actualizar la contraseña' });
     }
+});
+// Ruta de Olvido de Contraseña (sin autenticación)
+router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+
+    const db = getDB();
+    const user = db.prepare(`
+        SELECT id, email, nombres 
+        FROM personas 
+        WHERE email = ?
+    `).get(email);
+
+    // ⚠️ Esto es importante por seguridad
+    if (!user) {
+        return res.json({ message: 'Si el correo existe, se enviará un enlace' });
+    }
+
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 15 * 60000).toISOString();
+
+    db.prepare(`
+        INSERT INTO password_resets (user_id, token, expires_at)
+        VALUES (?, ?, ?)
+    `).run(user.id, token, expiresAt);
+
+    const link = `https://app.unicatolica.online/#/reset-password?token=${token}`;
+    await sendPasswordResetEmail(user.email, user.nombres, link);
+
+    res.json({ message: 'Si el correo existe, se enviará un enlace' });
 });
 
 module.exports = router;
