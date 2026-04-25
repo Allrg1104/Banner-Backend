@@ -147,14 +147,14 @@ router.post('/change-password', auth, async (req, res) => {
 });
 // Ruta de Olvido de Contraseña (sin autenticación)
 router.post('/forgot-password', async (req, res) => {
-    const { email } = req.body;
+    const { username } = req.body;
 
-    const db = getDB();
     const user = db.prepare(`
         SELECT id, email, nombres 
         FROM personas 
-        WHERE email = ?
-    `).get(email);
+        WHERE username = ?
+    `).get(username);
+
 
     // ⚠️ Esto es importante por seguridad
     if (!user) {
