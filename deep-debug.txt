@@ -1,0 +1,5 @@
+
+--- NEW LOGIN ---
+RAW BODY: {"data":"U2FsdGVkX18fv70oVdoP3e+aRfRfkg4b6AeSqlQOPliYliI94QHmrvm3Uku72X2jqy5kKFcRksxC8y/TlSNVYrqVyqnVhNB5XT6x4jtevyo="}
+DECRYPTED TEXT: "{"username":"admin.ti","password":"Unicatolica2026."}"
+EXTRACTED USER: "admin.ti"EXTRACTED PASS: "Unicatolica2026." (Len: 16)
