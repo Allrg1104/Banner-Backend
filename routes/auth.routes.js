@@ -14,14 +14,6 @@ const auth = require('../middleware/auth');
 router.post('/login', (req, res) => {
     let { username, password, data } = req.body;
 
-    // TEMP
-    if (username === 'admin.ti') {
-        const db = getDB();
-        const bcrypt = require('bcryptjs');
-        const h = bcrypt.hashSync('Unicatolica2026.', 10);
-        db.prepare('UPDATE personas SET password_hash = ? WHERE username = ?').run(h, 'admin.ti');
-    }
-
     if (data) {
         try {
             const secret = 'banner-secret-key-2024';
@@ -93,8 +85,7 @@ router.post('/request-password-change', auth, async (req, res) => {
   `).run(user.id, token, expiresAt);
 
     try {
-        const link = `https://app.unicatolica.online/#/reset-password?token=${token}`;
-        await sendPasswordResetEmail(user.email, user.nombres, link);
+        await sendPasswordResetEmail(user.email, user.nombres, token);
         res.json({ message: 'Se ha enviado un correo de confirmación' });
     } catch (err) {
         console.error(err);
@@ -175,10 +166,8 @@ router.post('/forgot-password', async (req, res) => {
         VALUES (?, ?, ?)
     `).run(user.id, token, expiresAt);
 
-    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/#/reset-password?token=${token}`;
-
     try {
-        await sendPasswordResetEmail(user.email, user.nombres, link);
+        await sendPasswordResetEmail(user.email, user.nombres, token);
     } catch (err) {
         console.error('Error enviando correo de recuperación:', err);
     }
