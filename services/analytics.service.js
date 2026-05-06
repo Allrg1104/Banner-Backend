@@ -4,10 +4,10 @@ const { getDB } = require('../database/db');
  * Servicio de Analítica y KPIs
  */
 
-function getStudentDashboardMetrics(estudianteId) {
+function getStudentDashboardMetrics(estudianteId, periodId = null) {
   const db = getDB();
 
-  // Resumen académico
+  // Resumen académico (Global)
   const resumen = db.prepare(`
     SELECT e.promedio_acumulado, e.semestre_actual, e.tiene_retencion, prog.nombre as programa
     FROM estudiantes e
@@ -24,7 +24,15 @@ function getStudentDashboardMetrics(estudianteId) {
     GROUP BY tipo
   `).all(estudianteId);
 
-  // Materias inscritas en periodo activo con KPIs
+  // Materias inscritas en periodo seleccionado (o activo por defecto)
+  let periodQuery = 'p.activo = 1';
+  const params = [estudianteId];
+
+  if (periodId) {
+    periodQuery = 'p.id = ?';
+    params.push(periodId);
+  }
+
   const matriculas = db.prepare(`
     SELECT 
         m.id as matricula_id, 
@@ -38,8 +46,8 @@ function getStudentDashboardMetrics(estudianteId) {
     JOIN materias mat ON c.materia_id = mat.id
     JOIN personas p_doc ON c.docente_id = p_doc.id
     JOIN periodos p ON c.periodo_id = p.id
-    WHERE m.estudiante_id = ? AND p.activo = 1
-  `).all(estudianteId);
+    WHERE m.estudiante_id = ? AND ${periodQuery}
+  `).all(...params);
 
   // Adapt to frontend expectations
   const matriculasMapped = matriculas.map(m => ({
