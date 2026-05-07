@@ -200,10 +200,10 @@ router.get('/courses/:id/attendance-report', auth, isTeacher, (req, res) => {
     try {
         // 1. Obtener todas las fechas donde hubo clase (con asistencia)
         const dates = db.prepare(`
-            SELECT DISTINCT fecha FROM asistencia a
+            SELECT DISTINCT a.fecha FROM asistencia a
             JOIN matriculas m ON a.matricula_id = m.id
             WHERE m.curso_id = ?
-            ORDER BY fecha ASC
+            ORDER BY a.fecha ASC
         `).all(req.params.id);
 
         // 2. Obtener lista de estudiantes
