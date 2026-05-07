@@ -176,4 +176,34 @@ router.get('/reseed-debug', (req, res) => {
     }
 });
 
+// Listar solicitudes del estudiante
+router.get('/:id/requests', auth, (req, res) => {
+    const db = getDB();
+    try {
+        const requests = db.prepare(`
+            SELECT * FROM solicitudes 
+            WHERE estudiante_id = ? 
+            ORDER BY fecha DESC
+        `).all(req.params.id);
+        res.json(requests);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Crear nueva solicitud
+router.post('/:id/requests', auth, (req, res) => {
+    const db = getDB();
+    const { tipo, descripcion } = req.body;
+    try {
+        db.prepare(`
+            INSERT INTO solicitudes (estudiante_id, tipo, descripcion, estado)
+            VALUES (?, ?, ?, 'pendiente')
+        `).run(req.params.id, tipo, descripcion);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
