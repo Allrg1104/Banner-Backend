@@ -52,17 +52,23 @@ router.post('/login', (req, res) => {
         { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
+    const userObj = {
+        id: user.id,
+        nombres: user.nombres,
+        apellidos: user.apellidos,
+        username: user.username,
+        email: user.email,
+        rol: user.rol,
+        must_change_password: !!user.must_change_password
+    };
+
+    const secret = 'banner-secret-key-2024';
+    const encryptedUser = cryptoJS.AES.encrypt(JSON.stringify(userObj), secret).toString();
+
     res.json({
+        message: 'Login autorizado',
         token,
-        user: {
-            id: user.id,
-            nombres: user.nombres,
-            apellidos: user.apellidos,
-            username: user.username,
-            email: user.email,
-            rol: user.rol,
-            must_change_password: !!user.must_change_password
-        }
+        data: encryptedUser
     });
 });
 
