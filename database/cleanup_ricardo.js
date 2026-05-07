@@ -46,10 +46,11 @@ async function cleanupAndSeedRicardo() {
             }
         }
 
+        db.save(); // 🔥 CRÍTICO: Persistir cambios en disco
         console.log('✅ Ricardo ahora tiene exactamente 3 materias con estudiantes reales.');
         process.exit(0);
     } catch (e) {
-        console.error(e);
+        console.error('❌ Error en el proceso:', e);
         process.exit(1);
     }
 }
