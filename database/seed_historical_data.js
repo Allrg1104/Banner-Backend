@@ -31,10 +31,10 @@ async function seedHistoricalData() {
 
         // 3. Función para poblar un periodo
         const populatePeriod = (periodId, prefix) => {
-            console.log(`Creating data for ${prefix} (ID: ${periodId})...`);
+            console.log(`Poblando datos para ${prefix} (ID: ${periodId})...`);
             
-            // Crear 4 cursos para este periodo
-            for (let i = 0; i < 4; i++) {
+            // Crear al menos 7 cursos para este periodo si no existen
+            for (let i = 0; i < 7; i++) {
                 const matId = materias[i % materias.length].id;
                 const docId = docentes[i % docentes.length].id;
                 db.prepare(`
@@ -47,18 +47,39 @@ async function seedHistoricalData() {
 
             db.transaction(() => {
                 for (const est of estudiantes) {
-                    // Matricular en 3 cursos
-                    const myCursos = cursos.sort(() => 0.5 - Math.random()).slice(0, 3);
+                    // Matricular en exactamente 7 cursos (o todos los disponibles)
+                    const myCursos = cursos.slice(0, 7);
+                    
                     for (const c of myCursos) {
-                        const res = db.prepare(`INSERT OR IGNORE INTO matriculas (estudiante_id, curso_id) VALUES (?, ?)`).run(est.id, c.id);
+                        const res = db.prepare(`
+                            INSERT OR IGNORE INTO matriculas (estudiante_id, curso_id) 
+                            VALUES (?, ?)
+                        `).run(est.id, c.id);
+
+                        let matriculaId;
                         if (res.changes > 0) {
-                            const mId = res.lastInsertRowid;
-                            // Notas
-                            const notaBase = Math.random() * 1.5 + 3.0; // Notas entre 3.0 y 4.5
-                            db.prepare(`INSERT INTO calificaciones (matricula_id, componente, valor, fecha) VALUES (?, 'Final', ?, '2025-11-01')`).run(mId, notaBase.toFixed(1));
-                            // Asistencia
-                            db.prepare(`INSERT INTO asistencia (matricula_id, fecha, tipo) VALUES (?, '2025-10-01', 'presente')`).run(mId);
+                            matriculaId = res.lastInsertRowid;
+                        } else {
+                            const existing = db.prepare('SELECT id FROM matriculas WHERE estudiante_id = ? AND curso_id = ?').get(est.id, c.id);
+                            matriculaId = existing.id;
                         }
+
+                        // Limpiar notas previas para este periodo y estudiante para evitar duplicados en pruebas
+                        db.prepare('DELETE FROM calificaciones WHERE matricula_id = ?').run(matriculaId);
+
+                        // Agregar exactamente 3 notas por materia
+                        const componentes = ['Parcial 1', 'Parcial 2', 'Examen Final'];
+                        for (const comp of componentes) {
+                            const nota = (Math.random() * 2 + 3).toFixed(1); // Notas entre 3.0 y 5.0
+                            db.prepare(`
+                                INSERT INTO calificaciones (matricula_id, componente, valor, fecha) 
+                                VALUES (?, ?, ?, ?)
+                            `).run(matriculaId, comp, parseFloat(nota), prefix === '2025-1' ? '2025-04-15' : '2025-10-20');
+                        }
+
+                        // Agregar asistencia
+                        db.prepare(`INSERT OR IGNORE INTO asistencia (matricula_id, fecha, tipo) VALUES (?, ?, 'presente')`)
+                          .run(matriculaId, prefix === '2025-1' ? '2025-03-10' : '2025-09-15');
                     }
                 }
             })();
