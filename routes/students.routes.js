@@ -178,13 +178,20 @@ router.get('/reseed-debug', (req, res) => {
 
 // Listar solicitudes del estudiante
 router.get('/:id/requests', auth, (req, res) => {
+    const targetId = parseInt(req.params.id);
+    
+    // Seguridad: Estudiante solo ve el suyo.
+    if (req.user.rol === 'estudiante' && req.user.id !== targetId) {
+        return res.status(403).json({ error: 'No tienes permiso para ver estas solicitudes' });
+    }
+
     const db = getDB();
     try {
         const requests = db.prepare(`
             SELECT * FROM solicitudes 
             WHERE estudiante_id = ? 
             ORDER BY fecha DESC
-        `).all(req.params.id);
+        `).all(targetId);
         res.json(requests);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -193,13 +200,20 @@ router.get('/:id/requests', auth, (req, res) => {
 
 // Crear nueva solicitud
 router.post('/:id/requests', auth, (req, res) => {
+    const targetId = parseInt(req.params.id);
+
+    // Seguridad: Estudiante solo crea para sí mismo
+    if (req.user.rol === 'estudiante' && req.user.id !== targetId) {
+        return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     const db = getDB();
     const { tipo, descripcion } = req.body;
     try {
         db.prepare(`
             INSERT INTO solicitudes (estudiante_id, tipo, descripcion, estado)
             VALUES (?, ?, ?, 'pendiente')
-        `).run(req.params.id, tipo, descripcion);
+        `).run(targetId, tipo, descripcion);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
