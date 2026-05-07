@@ -27,7 +27,7 @@ async function seedHistoricalData() {
         // 2. Materias y Docentes
         const materias = db.prepare('SELECT id FROM materias').all();
         const docentes = db.prepare('SELECT id FROM personas WHERE rol = ?').all('docente');
-        const estudiantes = db.prepare('SELECT id FROM estudiantes').all();
+        const estudiantes = db.prepare('SELECT persona_id as id FROM estudiantes').all();
 
         // 3. Función para poblar un periodo
         const populatePeriod = (periodId, prefix) => {
