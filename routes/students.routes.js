@@ -48,18 +48,22 @@ router.get('/:id/grades', auth, (req, res) => {
     if (req.user.rol === 'estudiante' && req.user.id !== targetId) return res.status(403).json({ error: 'Acceso denegado' });
 
     const db = getDB();
-    const grades = db.prepare(`
-    SELECT mat.nombre as materia, c.componente, c.valor, c.fecha
-    FROM matriculas m
-    JOIN calificaciones c ON m.id = c.matricula_id
-    JOIN cursos cu ON m.curso_id = cu.id
-    JOIN materias mat ON cu.materia_id = mat.id
-    JOIN periodos p ON cu.periodo_id = p.id
-    WHERE m.estudiante_id = ? AND p.activo = 1
-    ORDER BY mat.nombre, c.fecha
-  `).all(targetId);
-
-    res.json(grades);
+    try {
+        const grades = db.prepare(`
+            SELECT mat.nombre as materia, c.componente, c.valor, c.fecha
+            FROM matriculas m
+            JOIN calificaciones c ON m.id = c.matricula_id
+            JOIN cursos cu ON m.curso_id = cu.id
+            JOIN materias mat ON cu.materia_id = mat.id
+            JOIN periodos p ON cu.periodo_id = p.id
+            WHERE m.estudiante_id = ? AND p.activo = 1
+            ORDER BY mat.nombre, c.fecha
+        `).all(targetId);
+        res.json(grades || []);
+    } catch (err) {
+        console.error('Error en /grades:', err);
+        res.status(500).json({ error: 'Error al obtener calificaciones' });
+    }
 });
 
 router.get('/:id/attendance', auth, (req, res) => {
@@ -67,18 +71,22 @@ router.get('/:id/attendance', auth, (req, res) => {
     if (req.user.rol === 'estudiante' && req.user.id !== targetId) return res.status(403).json({ error: 'Acceso denegado' });
 
     const db = getDB();
-    const attendance = db.prepare(`
-    SELECT mat.nombre as materia, a.fecha, a.tipo
-    FROM matriculas m
-    JOIN asistencia a ON m.id = a.matricula_id
-    JOIN cursos cu ON m.curso_id = cu.id
-    JOIN materias mat ON cu.materia_id = mat.id
-    JOIN periodos p ON cu.periodo_id = p.id
-    WHERE m.estudiante_id = ? AND p.activo = 1
-    ORDER BY a.fecha DESC
-  `).all(targetId);
-
-    res.json(attendance);
+    try {
+        const attendance = db.prepare(`
+            SELECT mat.nombre as materia, a.fecha, a.tipo
+            FROM matriculas m
+            JOIN asistencia a ON m.id = a.matricula_id
+            JOIN cursos cu ON m.curso_id = cu.id
+            JOIN materias mat ON cu.materia_id = mat.id
+            JOIN periodos p ON cu.periodo_id = p.id
+            WHERE m.estudiante_id = ? AND p.activo = 1
+            ORDER BY a.fecha DESC
+        `).all(targetId);
+        res.json(attendance || []);
+    } catch (err) {
+        console.error('Error en /attendance:', err);
+        res.status(500).json({ error: 'Error al obtener asistencia' });
+    }
 });
 
 router.get('/:id/activity', auth, (req, res) => {
