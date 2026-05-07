@@ -8,8 +8,8 @@ async function seedAlejandro() {
     try {
         console.log('🚀 Iniciando carga de datos para Alejandro Rivera...');
 
-        // 1. Crear la persona si no existe
-        let persona = db.prepare('SELECT id FROM personas WHERE username = ?').get('alejandro.rivera01');
+        // 1. Crear la persona si no existe (Buscamos por username o email)
+        let persona = db.prepare('SELECT id FROM personas WHERE username = ? OR email = ?').get('alejandro.rivera01', 'alejandro.rivera01@unicatolica.edu.co');
         
         if (!persona) {
             const passwordHash = bcrypt.hashSync('Temp2024!', 10);
@@ -28,6 +28,8 @@ async function seedAlejandro() {
             );
             persona = { id: res.lastInsertRowid };
             console.log('✅ Usuario Alejandro creado.');
+        } else {
+            console.log('ℹ️ El usuario Alejandro ya existe. Actualizando sus datos académicos...');
         }
 
         // 2. Asegurar que esté en la tabla de estudiantes
