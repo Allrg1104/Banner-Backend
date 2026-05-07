@@ -38,14 +38,18 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
+console.log('🚀 Registrando rutas...');
 app.use('/api/auth', require('./routes/auth.routes'));
+console.log('✅ Rutas de Auth registradas');
 app.use('/api/students', require('./routes/students.routes'));
+console.log('✅ Rutas de Students registradas');
 app.use('/api/teachers', require('./routes/teachers.routes'));
 app.use('/api/directors', require('./routes/directors.routes'));
 app.use('/api/financial', require('./routes/financial.routes'));
 app.use('/api/registro', require('./routes/registro.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/risk', require('./routes/risk.routes'));
+console.log('✨ Todas las rutas registradas correctamente');
 
 // ─── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
