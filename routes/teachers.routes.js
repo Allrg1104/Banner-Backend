@@ -160,7 +160,8 @@ router.post('/import-attendance', auth, isTeacher, (req, res) => {
                     const type = item.status?.toLowerCase() || 'presente';
                     if (!validTypes.includes(type)) throw new Error('Estado inválido');
 
-                    db.prepare('INSERT INTO asistencia (matricula_id, fecha, tipo) VALUES (?, ?, ?)').run(matricula.id, item.date || date('now'), type);
+                    const attendanceDate = item.date || new Date().toISOString().split('T')[0];
+                    db.prepare('INSERT INTO asistencia (matricula_id, fecha, tipo) VALUES (?, ?, ?)').run(matricula.id, attendanceDate, type);
                     results.success++;
                 } catch (e) {
                     results.errors.push({ item: item.student_id, error: e.message });
