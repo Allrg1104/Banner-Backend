@@ -85,10 +85,45 @@ async function seedHistoricalData() {
             })();
         };
 
-        populatePeriod(p1Id, '2025-1');
-        populatePeriod(p2Id, '2025-2');
+        // 4. Poblar solicitudes aleatorias
+        console.log('Generando solicitudes para todos los estudiantes...');
+        const requestTypes = [
+            'Certificados Académicos: Certificado de Estudio',
+            'Certificados Académicos: Certificado de Notas',
+            'Solicitudes Académicas: Reingreso',
+            'Solicitudes Financieras: Certificado Financiero'
+        ];
+        const statusOptions = ['pendiente', 'en_proceso', 'aprobada', 'rechazada'];
+        const responses = {
+            'aprobada': 'Tu solicitud ha sido procesada exitosamente. El documento fue enviado a tu correo institucional.',
+            'rechazada': 'No es posible procesar tu solicitud debido a inconsistencias en los datos proporcionados.',
+            'en_proceso': 'Estamos verificando tu información con el departamento correspondiente.'
+        };
 
-        console.log('✅ Carga completa. Todos los estudiantes tienen datos en 2025-1 y 2025-2.');
+        db.transaction(() => {
+            for (const est of estudiantes) {
+                // 2 solicitudes aleatorias por estudiante
+                for (let i = 0; i < 2; i++) {
+                    const tipo = requestTypes[Math.floor(Math.random() * requestTypes.length)];
+                    const estado = statusOptions[Math.floor(Math.random() * statusOptions.length)];
+                    const respuesta = responses[estado] || null;
+                    
+                    db.prepare(`
+                        INSERT INTO solicitudes (estudiante_id, tipo, estado, descripcion, respuesta, fecha)
+                        VALUES (?, ?, ?, ?, ?, datetime('now', ?))
+                    `).run(
+                        est.id, 
+                        tipo, 
+                        estado, 
+                        'Solicitud generada automáticamente para pruebas del sistema.',
+                        respuesta,
+                        `-${Math.floor(Math.random() * 10)} days`
+                    );
+                }
+            }
+        })();
+
+        console.log('✅ Carga completa. Todos los estudiantes tienen materias, notas y solicitudes.');
         process.exit(0);
     } catch (err) {
         console.error('❌ Error:', err.message);
