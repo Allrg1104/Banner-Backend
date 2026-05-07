@@ -5,11 +5,20 @@ const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
 const { getStudentDashboardMetrics } = require('../services/analytics.service');
 
-// Listar periodos disponibles
-router.get('/periodos', auth, (req, res) => {
+// Listar periodos donde el estudiante tiene matrículas
+router.get('/:id/periodos', auth, (req, res) => {
     const db = getDB();
+    const targetId = parseInt(req.params.id);
+
     try {
-        const periods = db.prepare('SELECT id, nombre, activo FROM periodos ORDER BY fecha_inicio DESC').all();
+        const periods = db.prepare(`
+            SELECT DISTINCT p.id, p.nombre, p.activo 
+            FROM periodos p
+            JOIN cursos c ON p.id = c.periodo_id
+            JOIN matriculas m ON c.id = m.curso_id
+            WHERE m.estudiante_id = ?
+            ORDER BY p.fecha_inicio DESC
+        `).all(targetId);
         res.json(periods);
     } catch (err) {
         res.status(500).json({ error: err.message });
