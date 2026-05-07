@@ -68,7 +68,7 @@ router.get('/:id/attendance', auth, (req, res) => {
 
     const db = getDB();
     const attendance = db.prepare(`
-    SELECT mat.nombre as materia, a.fecha, a.tipo, a.observacion
+    SELECT mat.nombre as materia, a.fecha, a.tipo
     FROM matriculas m
     JOIN asistencia a ON m.id = a.matricula_id
     JOIN cursos cu ON m.curso_id = cu.id
