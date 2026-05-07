@@ -86,11 +86,17 @@ async function seedHistoricalData() {
         };
 
         // 4. Poblar solicitudes aleatorias
-        console.log('Generando solicitudes para todos los estudiantes...');
+        console.log('Generando historial de solicitudes (5 por estudiante)...');
+        
+        // Limpiar solicitudes previas de prueba para tener un estado limpio
+        db.prepare('DELETE FROM solicitudes').run();
+
         const requestTypes = [
             'Certificados Académicos: Certificado de Estudio',
             'Certificados Académicos: Certificado de Notas',
+            'Certificados Académicos: Certificado de Horario',
             'Solicitudes Académicas: Reingreso',
+            'Solicitudes Académicas: Cancelación de Semestre',
             'Solicitudes Financieras: Certificado Financiero'
         ];
         const statusOptions = ['pendiente', 'en_proceso', 'aprobada', 'rechazada'];
@@ -102,11 +108,11 @@ async function seedHistoricalData() {
 
         db.transaction(() => {
             for (const est of estudiantes) {
-                // 2 solicitudes aleatorias por estudiante
-                for (let i = 0; i < 2; i++) {
+                // 5 solicitudes aleatorias por estudiante
+                for (let i = 0; i < 5; i++) {
                     const tipo = requestTypes[Math.floor(Math.random() * requestTypes.length)];
                     const estado = statusOptions[Math.floor(Math.random() * statusOptions.length)];
-                    const respuesta = responses[estado] || null;
+                    const respuesta = (estado === 'pendiente') ? null : (responses[estado] || 'Trámite finalizado.');
                     
                     db.prepare(`
                         INSERT INTO solicitudes (estudiante_id, tipo, estado, descripcion, respuesta, fecha)
@@ -115,16 +121,17 @@ async function seedHistoricalData() {
                         est.id, 
                         tipo, 
                         estado, 
-                        'Solicitud generada automáticamente para pruebas del sistema.',
+                        'Trámite realizado a través del portal estudiantil dinámico.',
                         respuesta,
-                        `-${Math.floor(Math.random() * 10)} days`
+                        `-${Math.floor(Math.random() * 20)} days`
                     );
                 }
             }
         })();
 
-        console.log('✅ Carga completa. Todos los estudiantes tienen materias, notas y solicitudes.');
+        console.log('✅ Carga completa. Todos los estudiantes tienen materias, notas y 5 solicitudes en su historial.');
         process.exit(0);
+
     } catch (err) {
         console.error('❌ Error:', err.message);
         process.exit(1);
