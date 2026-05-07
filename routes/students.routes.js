@@ -49,7 +49,7 @@ router.get('/:id/grades', auth, (req, res) => {
 
     const db = getDB();
     const grades = db.prepare(`
-    SELECT mat.nombre as materia, c.componente, c.valor, c.porcentaje, c.fecha
+    SELECT mat.nombre as materia, c.componente, c.valor, c.fecha
     FROM matriculas m
     JOIN calificaciones c ON m.id = c.matricula_id
     JOIN cursos cu ON m.curso_id = cu.id
