@@ -67,6 +67,22 @@ router.post('/login', (req, res) => {
 });
 
 /**
+ * GET /api/auth/me
+ * Retorna los datos actuales del usuario autenticado
+ */
+router.get('/me', auth, (req, res) => {
+    const db = getDB();
+    const user = db.prepare('SELECT id, nombres, apellidos, username, email, rol, documento, tipo_documento, telefono, fecha_nacimiento, activo, metadata, must_change_password FROM personas WHERE id = ?').get(req.user.id);
+    
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    
+    // Convertir booleano para consistencia con login
+    user.must_change_password = !!user.must_change_password;
+    
+    res.json(user);
+});
+
+/**
  * POST /api/auth/request-password-change
  * Inicia flujo de cambio de contraseña con confirmación por email
  */
