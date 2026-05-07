@@ -6,9 +6,9 @@ const rbac = require('../middleware/rbac');
 const { getStudentDashboardMetrics } = require('../services/analytics.service');
 
 // Listar periodos donde el estudiante tiene matrículas
-router.get('/periodos', auth, (req, res) => {
+router.get('/:id/periodos', auth, (req, res) => {
     const db = getDB();
-    const studentId = req.user.id;
+    const targetId = parseInt(req.params.id);
 
     try {
         const periods = db.prepare(`
@@ -18,7 +18,7 @@ router.get('/periodos', auth, (req, res) => {
             JOIN matriculas m ON c.id = m.curso_id
             WHERE m.estudiante_id = ?
             ORDER BY p.fecha_inicio DESC
-        `).all(studentId);
+        `).all(targetId);
         res.json(periods);
     } catch (err) {
         res.status(500).json({ error: err.message });
