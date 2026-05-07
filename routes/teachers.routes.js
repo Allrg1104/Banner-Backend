@@ -174,4 +174,60 @@ router.post('/import-attendance', auth, isTeacher, (req, res) => {
     }
 });
 
+// Obtener asistencia de un curso para una fecha específica
+router.get('/courses/:id/attendance', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    const { date } = req.query;
+
+    try {
+        const attendance = db.prepare(`
+            SELECT e.codigo as student_id, a.tipo as status
+            FROM asistencia a
+            JOIN matriculas m ON a.matricula_id = m.id
+            JOIN estudiantes e ON m.estudiante_id = e.persona_id
+            WHERE m.curso_id = ? AND a.fecha = ?
+        `).all(req.params.id, date);
+        
+        res.json(attendance);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Reporte general de asistencias del curso (Sábana)
+router.get('/courses/:id/attendance-report', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    try {
+        // 1. Obtener todas las fechas donde hubo clase (con asistencia)
+        const dates = db.prepare(`
+            SELECT DISTINCT fecha FROM asistencia a
+            JOIN matriculas m ON a.matricula_id = m.id
+            WHERE m.curso_id = ?
+            ORDER BY fecha ASC
+        `).all(req.params.id);
+
+        // 2. Obtener lista de estudiantes
+        const students = db.prepare(`
+            SELECT p.nombres || ' ' || p.apellidos as name, e.codigo as student_id, m.id as matricula_id
+            FROM matriculas m
+            JOIN personas p ON m.estudiante_id = p.id
+            JOIN estudiantes e ON p.id = e.persona_id
+            WHERE m.curso_id = ?
+        `).all(req.params.id);
+
+        // 3. Cruzar datos
+        const report = students.map(s => {
+            const records = db.prepare('SELECT fecha, tipo FROM asistencia WHERE matricula_id = ?').all(s.matricula_id);
+            return {
+                ...s,
+                history: records
+            };
+        });
+
+        res.json({ dates: dates.map(d => d.fecha), students: report });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
