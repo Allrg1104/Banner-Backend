@@ -30,6 +30,98 @@ router.get('/my-courses', auth, isTeacher, (req, res) => {
     }
 });
 
+// NUEVO: Dashboard Analytics para Docentes (Seguimiento de Riesgo)
+router.get('/dashboard-analytics', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    try {
+        const teacherId = req.user.id;
+
+        // 1. Obtener todos los estudiantes de todos los cursos del docente
+        const allStudents = db.prepare(`
+            SELECT 
+                p.nombres || ' ' || p.apellidos as full_name,
+                e.codigo as institutional_id,
+                mat.nombre as subject_name,
+                m.id as matricula_id,
+                c.nrc
+            FROM matriculas m
+            JOIN cursos c ON m.curso_id = c.id
+            JOIN personas p ON m.estudiante_id = p.id
+            JOIN estudiantes e ON p.id = e.persona_id
+            JOIN materias mat ON c.materia_id = mat.id
+            WHERE c.docente_id = ?
+        `).all(teacherId);
+
+        const riskList = [];
+        let totalGrades = 0;
+        let gradesCount = 0;
+
+        allStudents.forEach(s => {
+            // Calcular Promedio
+            const grades = db.prepare('SELECT valor FROM calificaciones WHERE matricula_id = ?').all(s.matricula_id);
+            const validGrades = grades.filter(g => g.valor !== null);
+            const avg = validGrades.length > 0 ? validGrades.reduce((a, b) => a + b.valor, 0) / validGrades.length : null;
+
+            if (avg !== null) {
+                totalGrades += avg;
+                gradesCount++;
+            }
+
+            // Calcular Inasistencias
+            const absences = db.prepare(`
+                SELECT tipo, COUNT(*) as count 
+                FROM asistencia 
+                WHERE matricula_id = ? AND tipo != 'presente'
+                GROUP BY tipo
+            `).all(s.matricula_id);
+
+            const unexcused = absences.find(a => a.tipo === 'ausente_no_justificada')?.count || 0;
+            const excused = absences.find(a => a.tipo === 'ausente_justificada')?.count || 0;
+
+            // Determinar Nivel de Riesgo
+            let riskReason = [];
+            let riskLevel = 'normal';
+
+            if (unexcused > 3) {
+                riskReason.push(`${unexcused} faltas injustificadas`);
+                riskLevel = 'critical';
+            } else if (excused > 5) {
+                riskReason.push(`${excused} faltas justificadas`);
+                riskLevel = 'warning';
+            }
+
+            if (avg !== null && avg < 3.0) {
+                riskReason.push(`Promedio bajo (${avg.toFixed(1)})`);
+                riskLevel = 'critical';
+            }
+
+            if (riskLevel !== 'normal') {
+                riskList.push({
+                    name: s.full_name,
+                    id: s.institutional_id,
+                    subject: s.subject_name,
+                    nrc: s.nrc,
+                    reason: riskReason.join(' / '),
+                    level: riskLevel,
+                    avg: avg ? avg.toFixed(1) : '--',
+                    absences: unexcused + excused
+                });
+            }
+        });
+
+        res.json({
+            stats: {
+                totalStudents: allStudents.length,
+                atRiskCount: riskList.length,
+                averageGlobal: gradesCount > 0 ? (totalGrades / gradesCount).toFixed(1) : '0.0'
+            },
+            riskList: riskList.sort((a, b) => a.level === 'critical' ? -1 : 1)
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Listar estudiantes de un curso con sus notas
 router.get('/courses/:id/students', auth, isTeacher, (req, res) => {
     const db = getDB();
