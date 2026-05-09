@@ -3,6 +3,37 @@ const router = express.Router();
 const { getDB } = require('../database/db');
 const auth = require('../middleware/auth');
 
+// BLOQUE DE AUTO-SANACIÓN: Asegurar que las tablas existan al iniciar las rutas
+const db = getDB();
+db.exec(`
+    CREATE TABLE IF NOT EXISTS syllabus (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        curso_id INTEGER NOT NULL UNIQUE,
+        contenido TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (curso_id) REFERENCES cursos(id)
+    );
+    CREATE TABLE IF NOT EXISTS indisponibilidad_docente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docente_id INTEGER NOT NULL,
+        fecha DATE NOT NULL,
+        motivo TEXT,
+        estado TEXT DEFAULT 'pendiente',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (docente_id) REFERENCES personas(id)
+    );
+    CREATE TABLE IF NOT EXISTS evaluacion_docente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docente_id INTEGER NOT NULL,
+        periodo_id INTEGER NOT NULL,
+        puntaje REAL NOT NULL,
+        comentarios TEXT,
+        participacion INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(docente_id, periodo_id)
+    );
+`);
+
 // Middleware para asegurar que solo docentes accedan
 const isTeacher = (req, res, next) => {
     if (req.user.rol !== 'docente' && req.user.rol !== 'admin') {
