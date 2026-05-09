@@ -30,7 +30,7 @@ router.get('/my-courses', auth, isTeacher, (req, res) => {
     }
 });
 
-// NUEVO: Dashboard Analytics para Docentes (Seguimiento de Riesgo)
+// NUEVO: Dashboard Analytics para Docentes (Seguimiento de Riesgo y General)
 router.get('/dashboard-analytics', auth, isTeacher, (req, res) => {
     const db = getDB();
     try {
@@ -53,11 +53,12 @@ router.get('/dashboard-analytics', auth, isTeacher, (req, res) => {
         `).all(teacherId);
 
         const riskList = [];
+        const overviewList = []; // Para mostrar información aunque no haya riesgo
         let totalGrades = 0;
         let gradesCount = 0;
 
         allStudents.forEach(s => {
-            // Calcular Promedio
+            // Calcular Promedio (Soportando 'Corte' o 'Parcial')
             const grades = db.prepare('SELECT valor FROM calificaciones WHERE matricula_id = ?').all(s.matricula_id);
             const validGrades = grades.filter(g => g.valor !== null);
             const avg = validGrades.length > 0 ? validGrades.reduce((a, b) => a + b.valor, 0) / validGrades.length : null;
@@ -82,31 +83,38 @@ router.get('/dashboard-analytics', auth, isTeacher, (req, res) => {
             let riskReason = [];
             let riskLevel = 'normal';
 
-            if (unexcused > 3) {
-                riskReason.push(`${unexcused} faltas injustificadas`);
+            // Alerta preventiva: > 2 faltas (antes de las 3 fatales)
+            if (unexcused >= 3) {
+                riskReason.push(`${unexcused} faltas injustificadas (Pérdida)`);
                 riskLevel = 'critical';
-            } else if (excused > 5) {
-                riskReason.push(`${excused} faltas justificadas`);
+            } else if (unexcused >= 2) {
+                riskReason.push(`${unexcused} faltas injustificadas (Alerta)`);
                 riskLevel = 'warning';
             }
 
             if (avg !== null && avg < 3.0) {
                 riskReason.push(`Promedio bajo (${avg.toFixed(1)})`);
                 riskLevel = 'critical';
+            } else if (avg !== null && avg < 3.5) {
+                riskReason.push(`Rendimiento regular (${avg.toFixed(1)})`);
+                if (riskLevel === 'normal') riskLevel = 'warning';
             }
 
+            const studentData = {
+                name: s.full_name,
+                id: s.institutional_id,
+                subject: s.subject_name,
+                nrc: s.nrc,
+                reason: riskReason.length > 0 ? riskReason.join(' / ') : 'Buen rendimiento',
+                level: riskLevel,
+                avg: avg ? avg.toFixed(1) : '--',
+                absences: unexcused + excused
+            };
+
             if (riskLevel !== 'normal') {
-                riskList.push({
-                    name: s.full_name,
-                    id: s.institutional_id,
-                    subject: s.subject_name,
-                    nrc: s.nrc,
-                    reason: riskReason.join(' / '),
-                    level: riskLevel,
-                    avg: avg ? avg.toFixed(1) : '--',
-                    absences: unexcused + excused
-                });
+                riskList.push(studentData);
             }
+            overviewList.push(studentData);
         });
 
         res.json({
@@ -115,7 +123,8 @@ router.get('/dashboard-analytics', auth, isTeacher, (req, res) => {
                 atRiskCount: riskList.length,
                 averageGlobal: gradesCount > 0 ? (totalGrades / gradesCount).toFixed(1) : '0.0'
             },
-            riskList: riskList.sort((a, b) => a.level === 'critical' ? -1 : 1)
+            riskList: riskList.sort((a, b) => a.level === 'critical' ? -1 : 1),
+            overviewList: overviewList.slice(0, 10) // Top 10 para el dashboard general
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
