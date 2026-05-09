@@ -331,13 +331,20 @@ router.get('/courses/:id/attendance-report', auth, isTeacher, (req, res) => {
     }
 });
 
-// --- SERVICIOS DOCENTES ADICIONALES (CRUD DINÁMICO) ---
+// --- SERVICIOS DOCENTES ADICIONALES (CRUD DINÁMICO Y PROTEGIDO) ---
 
-// 1. Gestión de Syllabus (Plan de Curso)
+// 1. Gestión de Syllabus (Plan de Curso) - PROTEGIDO
 router.get('/courses/:id/syllabus', auth, isTeacher, (req, res) => {
     const db = getDB();
     try {
-        const syllabus = db.prepare('SELECT * FROM syllabus WHERE curso_id = ?').get(req.params.id);
+        const teacherId = req.user.id;
+        const cursoId = req.params.id;
+
+        // Validar que el curso pertenezca al docente que consulta
+        const course = db.prepare('SELECT id FROM cursos WHERE id = ? AND docente_id = ?').get(cursoId, teacherId);
+        if (!course) return res.status(403).json({ error: 'Acceso denegado: No eres el docente de este curso' });
+
+        const syllabus = db.prepare('SELECT * FROM syllabus WHERE curso_id = ?').get(cursoId);
         res.json(syllabus || { contenido: '{}' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -348,6 +355,12 @@ router.post('/courses/syllabus', auth, isTeacher, (req, res) => {
     const db = getDB();
     const { curso_id, contenido } = req.body;
     try {
+        const teacherId = req.user.id;
+
+        // Validar que el curso pertenezca al docente antes de guardar
+        const course = db.prepare('SELECT id FROM cursos WHERE id = ? AND docente_id = ?').get(curso_id, teacherId);
+        if (!course) return res.status(403).json({ error: 'Acceso denegado: No puedes editar este Syllabus' });
+
         const existing = db.prepare('SELECT id FROM syllabus WHERE curso_id = ?').get(curso_id);
         if (existing) {
             db.prepare('UPDATE syllabus SET contenido = ?, updated_at = datetime("now") WHERE id = ?').run(JSON.stringify(contenido), existing.id);
@@ -360,7 +373,7 @@ router.post('/courses/syllabus', auth, isTeacher, (req, res) => {
     }
 });
 
-// 2. Gestión de Indisponibilidad
+// 2. Gestión de Indisponibilidad - AMARRADO A TU ID
 router.get('/availability', auth, isTeacher, (req, res) => {
     const db = getDB();
     try {
@@ -375,6 +388,7 @@ router.post('/availability', auth, isTeacher, (req, res) => {
     const db = getDB();
     const { fecha, motivo } = req.body;
     try {
+        // El docente_id se saca de la sesión (req.user.id), no del body, para evitar suplantación
         db.prepare('INSERT INTO indisponibilidad_docente (docente_id, fecha, motivo) VALUES (?, ?, ?)').run(req.user.id, fecha, motivo);
         res.json({ success: true });
     } catch (err) {
@@ -382,7 +396,7 @@ router.post('/availability', auth, isTeacher, (req, res) => {
     }
 });
 
-// 3. Resultados de Evaluación Docente
+// 3. Resultados de Evaluación Docente - SOLO TUS RESULTADOS
 router.get('/my-evaluations', auth, isTeacher, (req, res) => {
     const db = getDB();
     try {
@@ -399,7 +413,7 @@ router.get('/my-evaluations', auth, isTeacher, (req, res) => {
     }
 });
 
-// 4. Búsqueda de Estudiantes (Para Perfil Estudiante)
+// 4. Búsqueda de Estudiantes
 router.get('/students/search/:query', auth, isTeacher, (req, res) => {
     const db = getDB();
     const query = `%${req.params.query}%`;
