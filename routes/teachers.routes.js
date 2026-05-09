@@ -3,36 +3,41 @@ const router = express.Router();
 const { getDB } = require('../database/db');
 const auth = require('../middleware/auth');
 
-// BLOQUE DE AUTO-SANACIÓN: Asegurar que las tablas existan al iniciar las rutas
-const db = getDB();
-db.exec(`
-    CREATE TABLE IF NOT EXISTS syllabus (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        curso_id INTEGER NOT NULL UNIQUE,
-        contenido TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (curso_id) REFERENCES cursos(id)
-    );
-    CREATE TABLE IF NOT EXISTS indisponibilidad_docente (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        docente_id INTEGER NOT NULL,
-        fecha DATE NOT NULL,
-        motivo TEXT,
-        estado TEXT DEFAULT 'pendiente',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (docente_id) REFERENCES personas(id)
-    );
-    CREATE TABLE IF NOT EXISTS evaluacion_docente (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        docente_id INTEGER NOT NULL,
-        periodo_id INTEGER NOT NULL,
-        puntaje REAL NOT NULL,
-        comentarios TEXT,
-        participacion INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(docente_id, periodo_id)
-    );
-`);
+// Función para asegurar que las tablas existan (se llama bajo demanda para evitar bloqueos en el arranque)
+const ensureTables = (db) => {
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS syllabus (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                curso_id INTEGER NOT NULL UNIQUE,
+                contenido TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (curso_id) REFERENCES cursos(id)
+            );
+            CREATE TABLE IF NOT EXISTS indisponibilidad_docente (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                docente_id INTEGER NOT NULL,
+                fecha DATE NOT NULL,
+                motivo TEXT,
+                estado TEXT DEFAULT 'pendiente',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (docente_id) REFERENCES personas(id)
+            );
+            CREATE TABLE IF NOT EXISTS evaluacion_docente (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                docente_id INTEGER NOT NULL,
+                periodo_id INTEGER NOT NULL,
+                puntaje REAL NOT NULL,
+                comentarios TEXT,
+                participacion INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(docente_id, periodo_id)
+            );
+        `);
+    } catch (e) {
+        console.error("Error asegurando tablas:", e.message);
+    }
+};
 
 // Middleware para asegurar que solo docentes accedan
 const isTeacher = (req, res, next) => {
@@ -64,6 +69,7 @@ router.get('/my-courses', auth, isTeacher, (req, res) => {
 // NUEVO: Dashboard Analytics para Docentes (Seguimiento de Riesgo y General)
 router.get('/dashboard-analytics', auth, isTeacher, (req, res) => {
     const db = getDB();
+    ensureTables(db);
     try {
         const teacherId = req.user.id;
 
@@ -367,6 +373,7 @@ router.get('/courses/:id/attendance-report', auth, isTeacher, (req, res) => {
 // 1. Gestión de Syllabus (Plan de Curso) - PROTEGIDO
 router.get('/courses/:id/syllabus', auth, isTeacher, (req, res) => {
     const db = getDB();
+    ensureTables(db);
     try {
         const teacherId = req.user.id;
         const cursoId = req.params.id;
@@ -407,6 +414,7 @@ router.post('/courses/syllabus', auth, isTeacher, (req, res) => {
 // 2. Gestión de Indisponibilidad - AMARRADO A TU ID
 router.get('/availability', auth, isTeacher, (req, res) => {
     const db = getDB();
+    ensureTables(db);
     try {
         const list = db.prepare('SELECT * FROM indisponibilidad_docente WHERE docente_id = ? ORDER BY fecha DESC').all(req.user.id);
         res.json(list);
@@ -430,6 +438,7 @@ router.post('/availability', auth, isTeacher, (req, res) => {
 // 3. Resultados de Evaluación Docente - SOLO TUS RESULTADOS
 router.get('/my-evaluations', auth, isTeacher, (req, res) => {
     const db = getDB();
+    ensureTables(db);
     try {
         const evaluations = db.prepare(`
             SELECT ed.*, p.nombre as periodo
