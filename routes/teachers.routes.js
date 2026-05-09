@@ -331,4 +331,90 @@ router.get('/courses/:id/attendance-report', auth, isTeacher, (req, res) => {
     }
 });
 
+// --- SERVICIOS DOCENTES ADICIONALES (CRUD DINÁMICO) ---
+
+// 1. Gestión de Syllabus (Plan de Curso)
+router.get('/courses/:id/syllabus', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    try {
+        const syllabus = db.prepare('SELECT * FROM syllabus WHERE curso_id = ?').get(req.params.id);
+        res.json(syllabus || { contenido: '{}' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/courses/syllabus', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    const { curso_id, contenido } = req.body;
+    try {
+        const existing = db.prepare('SELECT id FROM syllabus WHERE curso_id = ?').get(curso_id);
+        if (existing) {
+            db.prepare('UPDATE syllabus SET contenido = ?, updated_at = datetime("now") WHERE id = ?').run(JSON.stringify(contenido), existing.id);
+        } else {
+            db.prepare('INSERT INTO syllabus (curso_id, contenido) VALUES (?, ?)').run(curso_id, JSON.stringify(contenido));
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Gestión de Indisponibilidad
+router.get('/availability', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    try {
+        const list = db.prepare('SELECT * FROM indisponibilidad_docente WHERE docente_id = ? ORDER BY fecha DESC').all(req.user.id);
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/availability', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    const { fecha, motivo } = req.body;
+    try {
+        db.prepare('INSERT INTO indisponibilidad_docente (docente_id, fecha, motivo) VALUES (?, ?, ?)').run(req.user.id, fecha, motivo);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Resultados de Evaluación Docente
+router.get('/my-evaluations', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    try {
+        const evaluations = db.prepare(`
+            SELECT ed.*, p.nombre as periodo
+            FROM evaluacion_docente ed
+            JOIN periodos p ON ed.periodo_id = p.id
+            WHERE ed.docente_id = ?
+            ORDER BY p.fecha_inicio DESC
+        `).all(req.user.id);
+        res.json(evaluations);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. Búsqueda de Estudiantes (Para Perfil Estudiante)
+router.get('/students/search/:query', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    const query = `%${req.params.query}%`;
+    try {
+        const students = db.prepare(`
+            SELECT p.nombres || ' ' || p.apellidos as name, e.codigo as institutional_id, p.id
+            FROM estudiantes e
+            JOIN personas p ON e.persona_id = p.id
+            WHERE name LIKE ? OR e.codigo LIKE ?
+            LIMIT 10
+        `).all(query, query);
+        res.json(students);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
