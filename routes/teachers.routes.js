@@ -245,7 +245,7 @@ router.post('/update-grade', auth, isTeacher, (req, res) => {
 
         const existing = db.prepare('SELECT id FROM calificaciones WHERE matricula_id = ? AND componente = ?').get(matricula_id, componente);
         if (existing) {
-            db.prepare('UPDATE calificaciones SET valor = ?, updated_at = datetime("now") WHERE id = ?').run(valor, existing.id);
+            db.prepare('UPDATE calificaciones SET valor = ?, fecha = date("now") WHERE id = ?').run(valor, existing.id);
         } else {
             db.prepare('INSERT INTO calificaciones (matricula_id, componente, valor, fecha) VALUES (?, ?, ?, date("now"))').run(matricula_id, componente, valor);
         }
@@ -282,7 +282,7 @@ router.post('/import-grades', auth, isTeacher, (req, res) => {
                         if (valor !== undefined && valor !== null && valor !== '') {
                             const existing = db.prepare('SELECT id FROM calificaciones WHERE matricula_id = ? AND componente = ?').get(matricula.id, c);
                             if (existing) {
-                                db.prepare('UPDATE calificaciones SET valor = ?, updated_at = datetime("now") WHERE id = ?').run(valor, existing.id);
+                                db.prepare('UPDATE calificaciones SET valor = ?, fecha = date("now") WHERE id = ?').run(valor, existing.id);
                             } else {
                                 db.prepare('INSERT INTO calificaciones (matricula_id, componente, valor, fecha) VALUES (?, ?, ?, date("now"))').run(matricula.id, c, valor);
                             }
