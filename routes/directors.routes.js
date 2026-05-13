@@ -48,4 +48,70 @@ router.get('/dashboard', auth, rbac('director', 'decano', 'admin'), (req, res) =
     }
 });
 
+/**
+ * Asistencias del programa del director (periodo lectivo activo).
+ * Agrega presentes / inasistencias por estudiante; alerta si inasistencias > 3.
+ */
+router.get('/attendance', auth, rbac('director', 'decano', 'admin'), (req, res) => {
+    try {
+        const db = require('../database/db').getDB();
+        const directorId = req.user.id;
+
+        const programa = db.prepare('SELECT id, nombre FROM programas WHERE director_id = ?').get(directorId);
+
+        if (!programa) {
+            return res.json({
+                my_program: null,
+                students: [],
+                summary: {
+                    total_estudiantes: 0,
+                    estudiantes_con_alerta: 0,
+                    total_inasistencias: 0,
+                    total_presentes: 0
+                }
+            });
+        }
+
+        const rows = db.prepare(`
+            SELECT
+                p.id AS persona_id,
+                p.nombres,
+                p.apellidos,
+                e.codigo,
+                COALESCE(SUM(CASE WHEN per.activo = 1 AND a.tipo = 'presente' THEN 1 ELSE 0 END), 0) AS presentes,
+                COALESCE(SUM(CASE
+                    WHEN per.activo = 1 AND a.tipo IS NOT NULL AND a.tipo != 'presente' THEN 1
+                    ELSE 0
+                END), 0) AS inasistencias
+            FROM estudiantes e
+            JOIN personas p ON e.persona_id = p.id
+            LEFT JOIN matriculas m ON m.estudiante_id = p.id
+            LEFT JOIN cursos cu ON m.curso_id = cu.id
+            LEFT JOIN periodos per ON cu.periodo_id = per.id
+            LEFT JOIN asistencia a ON a.matricula_id = m.id
+            WHERE e.programa_id = ?
+            GROUP BY p.id, p.nombres, p.apellidos, e.codigo
+            ORDER BY inasistencias DESC, p.apellidos, p.nombres
+        `).all(programa.id);
+
+        const THRESHOLD = 3;
+        const students = rows.map((r) => ({
+            ...r,
+            alerta_alta_inasistencia: r.inasistencias > THRESHOLD,
+            total_registros: r.presentes + r.inasistencias
+        }));
+
+        const summary = {
+            total_estudiantes: students.length,
+            estudiantes_con_alerta: students.filter((s) => s.alerta_alta_inasistencia).length,
+            total_inasistencias: students.reduce((acc, s) => acc + s.inasistencias, 0),
+            total_presentes: students.reduce((acc, s) => acc + s.presentes, 0)
+        };
+
+        res.json({ my_program: programa, students, summary, umbral_alerta: THRESHOLD });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
