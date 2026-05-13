@@ -301,6 +301,37 @@ router.post('/import-grades', auth, isTeacher, (req, res) => {
     }
 });
 
+// Actualizar o insertar asistencia individual
+router.post('/update-attendance', auth, isTeacher, (req, res) => {
+    const db = getDB();
+    const { matricula_id, tipo, fecha } = req.body;
+
+    try {
+        const courseCheck = db.prepare(`
+            SELECT c.docente_id FROM matriculas m JOIN cursos c ON m.curso_id = c.id WHERE m.id = ?
+        `).get(matricula_id);
+
+        if (!courseCheck || (courseCheck.docente_id !== req.user.id && req.user.rol !== 'admin')) {
+            return res.status(403).json({ error: 'No tienes permiso' });
+        }
+
+        const validTypes = ['presente', 'ausente_justificada', 'ausente_no_justificada'];
+        if (!validTypes.includes(tipo)) {
+            return res.status(400).json({ error: 'Tipo de asistencia inválido' });
+        }
+
+        const existing = db.prepare('SELECT id FROM asistencia WHERE matricula_id = ? AND fecha = ?').get(matricula_id, fecha);
+        if (existing) {
+            db.prepare('UPDATE asistencia SET tipo = ? WHERE id = ?').run(tipo, existing.id);
+        } else {
+            db.prepare('INSERT INTO asistencia (matricula_id, fecha, tipo) VALUES (?, ?, ?)').run(matricula_id, fecha, tipo);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Importación masiva de asistencia
 router.post('/import-attendance', auth, isTeacher, (req, res) => {
     const db = getDB();
