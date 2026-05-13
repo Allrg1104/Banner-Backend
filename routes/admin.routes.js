@@ -31,16 +31,23 @@ router.get('/users', auth, rbac('admin'), (req, res) => {
     const { search } = req.query;
     const db = getDB();
 
-    let query = 'SELECT id, nombres, apellidos, email, username, rol, documento, activo, telefono, fecha_nacimiento, tipo_documento, metadata FROM personas';
+    let query = `
+        SELECT p.id, p.nombres, p.apellidos, p.email, p.username, p.rol, p.documento, 
+               p.activo, p.telefono, p.fecha_nacimiento, p.tipo_documento, p.metadata,
+               COALESCE(e.programa_id, pr.id) as programa_id
+        FROM personas p
+        LEFT JOIN estudiantes e ON p.id = e.persona_id
+        LEFT JOIN programas pr ON p.id = pr.director_id
+    `;
     const params = [];
 
     if (search) {
-        query += ' WHERE nombres LIKE ? OR apellidos LIKE ? OR documento LIKE ? OR username LIKE ?';
+        query += ' WHERE p.nombres LIKE ? OR p.apellidos LIKE ? OR p.documento LIKE ? OR p.username LIKE ?';
         const searchTerm = `%${search}%`;
         params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    query += ' ORDER BY id DESC LIMIT 200';
+    query += ' ORDER BY p.id DESC LIMIT 200';
 
     try {
         const users = db.prepare(query).all(...params);
