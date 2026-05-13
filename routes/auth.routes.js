@@ -89,6 +89,29 @@ router.get('/me', auth, (req, res) => {
 });
 
 /**
+ * PUT /api/auth/profile
+ * Permite al usuario autenticado actualizar su información personal (no sensible)
+ */
+router.put('/profile', auth, (req, res) => {
+    const { nombres, apellidos, fecha_nacimiento, metadata } = req.body;
+    const db = getDB();
+
+    try {
+        const metaString = metadata ? (typeof metadata === 'string' ? metadata : JSON.stringify(metadata)) : '{}';
+        
+        db.prepare(`
+            UPDATE personas 
+            SET nombres = ?, apellidos = ?, fecha_nacimiento = ?, metadata = ?, updated_at = datetime('now')
+            WHERE id = ?
+        `).run(nombres, apellidos, fecha_nacimiento, metaString, req.user.id);
+
+        res.json({ message: 'Perfil actualizado exitosamente' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * POST /api/auth/request-password-change
  * Inicia flujo de cambio de contraseña con confirmación por email
  */
