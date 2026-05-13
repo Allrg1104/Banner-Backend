@@ -300,6 +300,24 @@ async function initDB() {
           razon TEXT,
           fecha_calculo TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS sedes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS bloques (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sede_id INTEGER REFERENCES sedes(id),
+          nombre TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS salones (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          bloque_id INTEGER REFERENCES bloques(id),
+          nombre TEXT NOT NULL,
+          tipo TEXT DEFAULT 'aula'
+        );
     `;
 
   const statements = schema.split(';').filter(s => s.trim().length > 0);
@@ -314,8 +332,15 @@ async function initDB() {
     // Ignorar si la columna ya existe
   }
 
+  try {
+    db._db.run("ALTER TABLE cursos ADD COLUMN salon_id INTEGER REFERENCES salones(id);");
+  } catch (e) {
+    // Ignorar si la columna ya existe
+  }
+
   db.save();
-  console.log('✅ Base de datos inicializada correctamente');
+  const sedesCount = db.prepare('SELECT count(*) as count FROM sedes').get().count;
+  console.log('✅ Base de datos inicializada correctamente. Sedes encontradas:', sedesCount);
   return db;
 }
 

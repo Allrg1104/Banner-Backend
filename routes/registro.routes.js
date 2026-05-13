@@ -79,8 +79,10 @@ router.get('/salones/estructura', auth, rbac('registro', 'admin'), (req, res) =>
             return { ...sede, bloques: sedeBloques };
         });
         
+        console.log(`[DEBUG] /salones/estructura: Encontradas ${sedes.length} sedes`);
         res.json(result);
     } catch (err) {
+        console.error(`[ERROR] /salones/estructura: ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
@@ -124,6 +126,7 @@ router.post('/salones/asignar', auth, rbac('registro', 'admin'), (req, res) => {
         }
 
         db.prepare('UPDATE cursos SET salon_id = ?, horario = ? WHERE id = ?').run(salon_id, horario, curso_id);
+        db.save();
         res.json({ message: 'Asignación guardada correctamente' });
     } catch (err) {
         res.status(500).json({ error: err.message });
