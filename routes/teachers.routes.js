@@ -216,9 +216,9 @@ router.get('/courses/:id/students', auth, isTeacher, (req, res) => {
             return {
                 ...s,
                 grades: {
-                    'Corte 1': grades.find(g => g.componente === 'Corte 1')?.valor || null,
-                    'Corte 2': grades.find(g => g.componente === 'Corte 2')?.valor || null,
-                    'Corte 3': grades.find(g => g.componente === 'Corte 3')?.valor || null
+                    'Parcial 1': grades.find(g => g.componente === 'Parcial 1')?.valor || null,
+                    'Parcial 2': grades.find(g => g.componente === 'Parcial 2')?.valor || null,
+                    'Examen Final': grades.find(g => g.componente === 'Examen Final')?.valor || null
                 }
             };
         });
@@ -267,30 +267,31 @@ router.post('/import-grades', auth, isTeacher, (req, res) => {
         db.transaction(() => {
             for (const item of data) {
                 try {
-                    const curso = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND docente_id = ?').get(item.nrc, req.user.id);
-                    if (!curso) throw new Error(`NRC ${item.nrc} no válido`);
+                    const nrc = item.NRC || item.nrc;
+                    const student_id = item.ID_ESTUDIANTE || item.student_id;
+                    const componente = item.COMPONENTE || item.componente;
+                    const valor = item.NOTA || item.nota || item.valor;
 
-                    const estudiante = db.prepare('SELECT persona_id FROM estudiantes WHERE codigo = ?').get(item.student_id);
-                    if (!estudiante) throw new Error(`ID ${item.student_id} no existe`);
+                    const curso = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND docente_id = ?').get(nrc, req.user.id);
+                    if (!curso) throw new Error(`NRC ${nrc} no válido`);
+
+                    const estudiante = db.prepare('SELECT persona_id FROM estudiantes WHERE codigo = ?').get(student_id);
+                    if (!estudiante) throw new Error(`ID ${student_id} no existe`);
 
                     const matricula = db.prepare('SELECT id FROM matriculas WHERE curso_id = ? AND estudiante_id = ?').get(curso.id, estudiante.persona_id);
                     if (!matricula) throw new Error('No matriculado');
 
-                    const cortes = ['Corte 1', 'Corte 2', 'Corte 3'];
-                    cortes.forEach((c, idx) => {
-                        const valor = item[`corte${idx + 1}`];
-                        if (valor !== undefined && valor !== null && valor !== '') {
-                            const existing = db.prepare('SELECT id FROM calificaciones WHERE matricula_id = ? AND componente = ?').get(matricula.id, c);
-                            if (existing) {
-                                db.prepare('UPDATE calificaciones SET valor = ?, fecha = date("now") WHERE id = ?').run(valor, existing.id);
-                            } else {
-                                db.prepare('INSERT INTO calificaciones (matricula_id, componente, valor, fecha) VALUES (?, ?, ?, date("now"))').run(matricula.id, c, valor);
-                            }
+                    if (valor !== undefined && valor !== null && valor !== '') {
+                        const existing = db.prepare('SELECT id FROM calificaciones WHERE matricula_id = ? AND componente = ?').get(matricula.id, componente);
+                        if (existing) {
+                            db.prepare('UPDATE calificaciones SET valor = ?, fecha = date("now") WHERE id = ?').run(valor, existing.id);
+                        } else {
+                            db.prepare('INSERT INTO calificaciones (matricula_id, componente, valor, fecha) VALUES (?, ?, ?, date("now"))').run(matricula.id, componente, valor);
                         }
-                    });
+                    }
                     results.success++;
                 } catch (e) {
-                    results.errors.push({ item: item.student_id, error: e.message });
+                    results.errors.push({ item: item.ID_ESTUDIANTE || item.student_id, error: e.message });
                 }
             }
         })();
@@ -312,24 +313,28 @@ router.post('/import-attendance', auth, isTeacher, (req, res) => {
         db.transaction(() => {
             for (const item of data) {
                 try {
-                    const curso = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND docente_id = ?').get(item.nrc, req.user.id);
-                    if (!curso) throw new Error(`NRC ${item.nrc} no válido`);
+                    const nrc = item.NRC || item.nrc;
+                    const student_id = item.ID_ESTUDIANTE || item.student_id;
+                    const typeRaw = item.TIPO || item.status || 'presente';
+                    const attendanceDate = item.FECHA || item.date || new Date().toISOString().split('T')[0];
 
-                    const estudiante = db.prepare('SELECT persona_id FROM estudiantes WHERE codigo = ?').get(item.student_id);
-                    if (!estudiante) throw new Error(`ID ${item.student_id} no existe`);
+                    const curso = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND docente_id = ?').get(nrc, req.user.id);
+                    if (!curso) throw new Error(`NRC ${nrc} no válido`);
+
+                    const estudiante = db.prepare('SELECT persona_id FROM estudiantes WHERE codigo = ?').get(student_id);
+                    if (!estudiante) throw new Error(`ID ${student_id} no existe`);
 
                     const matricula = db.prepare('SELECT id FROM matriculas WHERE curso_id = ? AND estudiante_id = ?').get(curso.id, estudiante.persona_id);
                     if (!matricula) throw new Error('No matriculado');
 
                     const validTypes = ['presente', 'ausente_justificada', 'ausente_no_justificada'];
-                    const type = item.status?.toLowerCase() || 'presente';
+                    const type = typeRaw.toLowerCase();
                     if (!validTypes.includes(type)) throw new Error('Estado inválido');
 
-                    const attendanceDate = item.date || new Date().toISOString().split('T')[0];
                     db.prepare('INSERT INTO asistencia (matricula_id, fecha, tipo) VALUES (?, ?, ?)').run(matricula.id, attendanceDate, type);
                     results.success++;
                 } catch (e) {
-                    results.errors.push({ item: item.student_id, error: e.message });
+                    results.errors.push({ item: item.ID_ESTUDIANTE || item.student_id, error: e.message });
                 }
             }
         })();
