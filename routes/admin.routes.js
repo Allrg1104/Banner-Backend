@@ -10,6 +10,20 @@ const bcrypt = require('bcryptjs');
  */
 
 /**
+ * GET /api/admin/programas
+ * List all academic programs
+ */
+router.get('/programas', auth, rbac('admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const programas = db.prepare('SELECT id, nombre, facultad FROM programas WHERE activo = 1 ORDER BY nombre').all();
+        res.json(programas);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * GET /api/admin/users
  * List all users with optional search
  */
@@ -43,7 +57,7 @@ router.get('/users', auth, rbac('admin'), (req, res) => {
 router.post('/users', auth, rbac('admin'), (req, res) => {
     const {
         nombres, apellidos, email, username, password, rol,
-        documento, tipo_documento, telefono, fecha_nacimiento, metadata
+        documento, tipo_documento, telefono, fecha_nacimiento, metadata, programa_id
     } = req.body;
 
     if (!nombres || !email || !username || !password || !rol) {
@@ -55,20 +69,36 @@ router.post('/users', auth, rbac('admin'), (req, res) => {
     const metaString = metadata ? JSON.stringify(metadata) : '{}';
 
     try {
-        const result = db.prepare(`
-            INSERT INTO personas (
-                nombres, apellidos, email, username, password_hash, rol, 
-                documento, tipo_documento, telefono, fecha_nacimiento, metadata, must_change_password
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        `).run(
-            nombres, apellidos, email, username, password_hash, rol,
-            documento, tipo_documento || 'CC', telefono, fecha_nacimiento, metaString
-        );
+        db.transaction(() => {
+            const result = db.prepare(`
+                INSERT INTO personas (
+                    nombres, apellidos, email, username, password_hash, rol, 
+                    documento, tipo_documento, telefono, fecha_nacimiento, metadata, must_change_password
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            `).run(
+                nombres, apellidos, email, username, password_hash, rol,
+                documento, tipo_documento || 'CC', telefono, fecha_nacimiento, metaString
+            );
 
-        res.status(201).json({ id: result.lastInsertRowid, message: 'Usuario creado exitosamente' });
+            const newUserId = result.lastInsertRowid;
+
+            // Vincular al programa según el rol
+            if (rol === 'estudiante') {
+                const codigo = documento || username; // Generar código por defecto si no existe
+                db.prepare(`
+                    INSERT INTO estudiantes (persona_id, programa_id, codigo, semestre_actual, estado)
+                    VALUES (?, ?, ?, 1, 'activo')
+                `).run(newUserId, programa_id || null, codigo);
+            } else if (rol === 'director' && programa_id) {
+                db.prepare(`UPDATE programas SET director_id = ? WHERE id = ?`).run(newUserId, programa_id);
+            }
+            
+            res.status(201).json({ id: newUserId, message: 'Usuario creado exitosamente' });
+        })();
     } catch (err) {
-        res.status(500).json({ error: 'Error al crear usuario (posible duplicado de email/username)' });
+        console.error('Error creando usuario:', err);
+        res.status(500).json({ error: 'Error al crear usuario (posible duplicado o error de base de datos)' });
     }
 });
 
@@ -80,7 +110,7 @@ router.put('/users/:id', auth, rbac('admin'), (req, res) => {
     const { id } = req.params;
     const {
         nombres, apellidos, email, rol, documento, tipo_documento,
-        telefono, fecha_nacimiento, activo, metadata
+        telefono, fecha_nacimiento, activo, metadata, programa_id
     } = req.body;
     const db = getDB();
 
@@ -93,20 +123,42 @@ router.put('/users/:id', auth, rbac('admin'), (req, res) => {
 
         const metaString = metadata ? JSON.stringify(metadata) : '{}';
 
-        db.prepare(`
-            UPDATE personas 
-            SET nombres = ?, apellidos = ?, email = ?, rol = ?, documento = ?, 
-                tipo_documento = ?, telefono = ?, fecha_nacimiento = ?, 
-                activo = ?, metadata = ?, updated_at = datetime('now')
-            WHERE id = ?
-        `).run(
-            nombres, apellidos, email, rol, documento,
-            tipo_documento, telefono, fecha_nacimiento,
-            activo ? 1 : 0, metaString, id
-        );
+        db.transaction(() => {
+            db.prepare(`
+                UPDATE personas 
+                SET nombres = ?, apellidos = ?, email = ?, rol = ?, documento = ?, 
+                    tipo_documento = ?, telefono = ?, fecha_nacimiento = ?, 
+                    activo = ?, metadata = ?, updated_at = datetime('now')
+                WHERE id = ?
+            `).run(
+                nombres, apellidos, email, rol, documento,
+                tipo_documento, telefono, fecha_nacimiento,
+                activo ? 1 : 0, metaString, id
+            );
 
-        res.json({ message: 'Usuario actualizado exitosamente' });
+            // Actualizar vinculaciones según rol
+            if (rol === 'estudiante' && programa_id) {
+                const est = db.prepare('SELECT id FROM estudiantes WHERE persona_id = ?').get(id);
+                if (est) {
+                    db.prepare('UPDATE estudiantes SET programa_id = ? WHERE persona_id = ?').run(programa_id, id);
+                } else {
+                    const codigo = documento || user.username;
+                    db.prepare(`
+                        INSERT INTO estudiantes (persona_id, programa_id, codigo, semestre_actual, estado)
+                        VALUES (?, ?, ?, 1, 'activo')
+                    `).run(id, programa_id, codigo);
+                }
+            } else if (rol === 'director' && programa_id) {
+                // Primero quitarlo como director de cualquier otro programa para evitar conflictos
+                db.prepare('UPDATE programas SET director_id = NULL WHERE director_id = ?').run(id);
+                // Luego asignarlo al nuevo
+                db.prepare('UPDATE programas SET director_id = ? WHERE id = ?').run(id, programa_id);
+            }
+
+            res.json({ message: 'Usuario actualizado exitosamente' });
+        })();
     } catch (err) {
+        console.error('Error actualizando usuario:', err);
         res.status(500).json({ error: err.message });
     }
 });
