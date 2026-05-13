@@ -117,8 +117,15 @@ router.post('/reset-password-bulk', auth, rbac('admin'), (req, res) => {
         return res.status(400).json({ error: 'IDs de usuario y nueva contraseña requeridos' });
     }
 
-    const hashedPassword = bcrypt.hashSync(newPassword, 10);
     const db = getDB();
+    
+    // Check if admin.ti is in the userIds
+    const adminUser = db.prepare('SELECT id FROM personas WHERE username = "admin.ti"').get();
+    if (adminUser && userIds.includes(adminUser.id)) {
+        return res.status(403).json({ error: 'Restricción: No se puede editar la contraseña del usuario Admin.TI' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
 
     const stmt = db.prepare('UPDATE personas SET password_hash = ?, must_change_password = 1 WHERE id = ?');
     const bulk = db.transaction((ids) => {
