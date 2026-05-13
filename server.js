@@ -18,7 +18,11 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+        // En desarrollo, permitir todo para evitar problemas con IPs locales
+        if (process.env.NODE_ENV === 'development') {
+            return callback(null, true);
+        }
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('No permitido por CORS'));
