@@ -325,7 +325,6 @@ async function initDB() {
     try { db._db.run(stmt + ';'); } catch (e) { /* ignore existing table errors */ }
   }
 
-  // Migración manual para columnas añadidas recientemente
   try {
     db._db.run("ALTER TABLE personas ADD COLUMN metadata TEXT DEFAULT '{}';");
   } catch (e) {
@@ -338,9 +337,16 @@ async function initDB() {
     // Ignorar si la columna ya existe
   }
 
+  try {
+    db._db.run("ALTER TABLE salones ADD COLUMN tipo TEXT DEFAULT 'aula';");
+  } catch (e) {
+    // Ignorar si la columna ya existe
+  }
+
   db.save();
   const sedesCount = db.prepare('SELECT count(*) as count FROM sedes').get().count;
-  console.log('✅ Base de datos inicializada correctamente. Sedes encontradas:', sedesCount);
+  console.log('✅ DB initialized. Path:', path.resolve(DB_PATH));
+  console.log('✅ Sedes encontradas en inicio:', sedesCount);
   return db;
 }
 
