@@ -37,7 +37,8 @@ function getStudentDashboardMetrics(estudianteId, periodId = null) {
     SELECT 
         m.id as matricula_id, 
         mat.nombre as materia, 
-        mat.codigo, 
+        mat.codigo,
+        c.nrc, 
         p_doc.nombres || ' ' || p_doc.apellidos as docente,
         COALESCE((SELECT AVG(valor) FROM calificaciones WHERE matricula_id = m.id AND valor IS NOT NULL), 0) as promedio,
         COALESCE((SELECT (COUNT(CASE WHEN tipo = 'presente' THEN 1 END) * 100.0 / COUNT(*)) FROM asistencia WHERE matricula_id = m.id), 100) as asistencia_porcentaje
