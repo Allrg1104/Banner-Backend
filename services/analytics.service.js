@@ -41,7 +41,9 @@ function getStudentDashboardMetrics(estudianteId, periodId = null) {
         c.nrc, 
         p_doc.nombres || ' ' || p_doc.apellidos as docente,
         COALESCE((SELECT AVG(valor) FROM calificaciones WHERE matricula_id = m.id AND valor IS NOT NULL), 0) as promedio,
-        COALESCE((SELECT (COUNT(CASE WHEN tipo = 'presente' THEN 1 END) * 100.0 / COUNT(*)) FROM asistencia WHERE matricula_id = m.id), 100) as asistencia_porcentaje
+        COALESCE((SELECT (COUNT(CASE WHEN tipo = 'presente' THEN 1 END) * 100.0 / COUNT(*)) FROM asistencia WHERE matricula_id = m.id), 100) as asistencia_porcentaje,
+        COALESCE((SELECT COUNT(*) FROM asistencia WHERE matricula_id = m.id AND tipo = 'ausente_no_justificada'), 0) as faltas_injustificadas,
+        COALESCE((SELECT COUNT(*) FROM asistencia WHERE matricula_id = m.id AND tipo = 'ausente_justificada'), 0) as faltas_justificadas
     FROM matriculas m
     JOIN cursos c ON m.curso_id = c.id
     JOIN materias mat ON c.materia_id = mat.id
@@ -53,7 +55,11 @@ function getStudentDashboardMetrics(estudianteId, periodId = null) {
   // Adapt to frontend expectations
   const matriculasMapped = matriculas.map(m => ({
     ...m,
-    asistencia: { porcentaje: Math.round(m.asistencia_porcentaje) }
+    asistencia: { 
+      porcentaje: Math.round(m.asistencia_porcentaje),
+      injustificadas: m.faltas_injustificadas,
+      justificadas: m.faltas_justificadas
+    }
   }));
 
   // Calculate the average for the period

@@ -79,10 +79,8 @@ router.get('/attendance', auth, rbac('director', 'decano', 'admin'), (req, res) 
                 p.apellidos,
                 e.codigo,
                 COALESCE(SUM(CASE WHEN per.activo = 1 AND a.tipo = 'presente' THEN 1 ELSE 0 END), 0) AS presentes,
-                COALESCE(SUM(CASE
-                    WHEN per.activo = 1 AND a.tipo IS NOT NULL AND a.tipo != 'presente' THEN 1
-                    ELSE 0
-                END), 0) AS inasistencias
+                COALESCE(SUM(CASE WHEN per.activo = 1 AND a.tipo = 'ausente_no_justificada' THEN 1 ELSE 0 END), 0) AS inasistencias_injustificadas,
+                COALESCE(SUM(CASE WHEN per.activo = 1 AND a.tipo = 'ausente_justificada' THEN 1 ELSE 0 END), 0) AS inasistencias_justificadas
             FROM estudiantes e
             JOIN personas p ON e.persona_id = p.id
             LEFT JOIN matriculas m ON m.estudiante_id = p.id
@@ -91,24 +89,33 @@ router.get('/attendance', auth, rbac('director', 'decano', 'admin'), (req, res) 
             LEFT JOIN asistencia a ON a.matricula_id = m.id
             WHERE e.programa_id = ?
             GROUP BY p.id, p.nombres, p.apellidos, e.codigo
-            ORDER BY inasistencias DESC, p.apellidos, p.nombres
+            ORDER BY inasistencias_injustificadas DESC, inasistencias_justificadas DESC, p.apellidos, p.nombres
         `).all(programa.id);
 
-        const THRESHOLD = 3;
         const students = rows.map((r) => ({
             ...r,
-            alerta_alta_inasistencia: r.inasistencias > THRESHOLD,
-            total_registros: r.presentes + r.inasistencias
+            inasistencias: r.inasistencias_injustificadas + r.inasistencias_justificadas,
+            alerta_alta_inasistencia: r.inasistencias_injustificadas >= 3 || r.inasistencias_justificadas >= 5,
+            alerta_riesgo: r.inasistencias_injustificadas === 2 || r.inasistencias_justificadas === 4,
+            total_registros: r.presentes + r.inasistencias_injustificadas + r.inasistencias_justificadas
         }));
 
         const summary = {
             total_estudiantes: students.length,
-            estudiantes_con_alerta: students.filter((s) => s.alerta_alta_inasistencia).length,
+            estudiantes_con_alerta: students.filter((s) => s.alerta_alta_inasistencia || s.alerta_riesgo).length,
             total_inasistencias: students.reduce((acc, s) => acc + s.inasistencias, 0),
             total_presentes: students.reduce((acc, s) => acc + s.presentes, 0)
         };
 
-        res.json({ my_program: programa, students, summary, umbral_alerta: THRESHOLD });
+        res.json({ 
+            my_program: programa, 
+            students, 
+            summary, 
+            reglas: { 
+                max_injustificadas: 3, 
+                max_justificadas: 5 
+            } 
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
