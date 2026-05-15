@@ -176,4 +176,47 @@ router.post('/reset-password-user', auth, rbac('registro', 'admin'), (req, res) 
     }
 });
 
+/**
+ * Gestión Académica (Materias, Docentes, Cursos)
+ */
+
+router.get('/materias', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const materias = db.prepare('SELECT id, nombre, codigo, creditos FROM materias ORDER BY nombre').all();
+        res.json(materias);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/docentes', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const docentes = db.prepare('SELECT id, nombres, apellidos FROM personas WHERE rol = "docente" AND activo = 1 ORDER BY nombres').all();
+        res.json(docentes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/cursos', auth, rbac('registro', 'admin'), (req, res) => {
+    const { materia_id, docente_id, nrc, salon, horario } = req.body;
+    const db = getDB();
+    try {
+        const activePeriod = db.prepare('SELECT id FROM periodos WHERE activo = 1').get();
+        if (!activePeriod) return res.status(400).json({ error: 'No hay un periodo académico activo para crear cursos.' });
+
+        db.prepare(`
+            INSERT INTO cursos (materia_id, docente_id, periodo_id, nrc, salon, horario, estado)
+            VALUES (?, ?, ?, ?, ?, ?, 'activo')
+        `).run(materia_id, docente_id, activePeriod.id, nrc, salon, horario);
+
+        db.save();
+        res.json({ success: true, message: 'Curso creado exitosamente' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al crear curso. Verifique que el NRC no esté duplicado.' });
+    }
+});
+
 module.exports = router;
