@@ -137,26 +137,15 @@ router.get('/reseed-debug', (req, res) => {
 
         // --- LIMPIEZA PROFUNDA ---
         db.prepare('DELETE FROM calificaciones WHERE matricula_id IN (SELECT id FROM matriculas WHERE estudiante_id = ?)').run(santiagoId);
+        // Limpieza de datos antiguos para asegurar integridad
         db.prepare('DELETE FROM asistencia WHERE matricula_id IN (SELECT id FROM matriculas WHERE estudiante_id = ?)').run(santiagoId);
         db.prepare('DELETE FROM matriculas WHERE estudiante_id = ?').run(santiagoId);
-        
-        // Borrar periodos y materias de prueba anteriores para evitar duplicados/conflictos
         db.prepare('DELETE FROM periodos WHERE id IN (1, 2)').run();
-        db.prepare('DELETE FROM materias WHERE id >= 990').run();
-        db.prepare('DELETE FROM cursos WHERE id >= 1 AND id <= 5').run();
-        db.prepare('DELETE FROM cursos WHERE id >= 990').run();
-
-        // --- PERIODO 2025-II (ID 1 - ACTUAL) ---
-        db.prepare("INSERT INTO periodos (id, nombre, fecha_inicio, fecha_fin, activo) VALUES (1, '2025-II', '2025-07-01', '2025-12-31', 1)").run();
         
-        [1, 2, 3, 4, 5].forEach((id) => {
-            db.prepare("INSERT OR REPLACE INTO materias (id, nombre, codigo, creditos) VALUES (?, ?, ?, ?)").run(id, 'Materia Actual ' + id, 'MAT-' + id, 3);
-            db.prepare("INSERT INTO cursos (id, materia_id, docente_id, periodo_id, cupo) VALUES (?, ?, 2, 1, 30)").run(id, id);
-            const m = db.prepare('INSERT INTO matriculas (estudiante_id, curso_id) VALUES (?, ?)').run(santiagoId, id);
-            const mid = m.lastInsertRowid;
-            db.prepare('INSERT INTO calificaciones (matricula_id, componente, valor, fecha) VALUES (?, ?, ?, ?)').run(mid, 'Parcial', 3.5, '2026-03-01');
-            db.prepare('INSERT INTO asistencia (matricula_id, fecha, tipo) VALUES (?, ?, ?)').run(mid, '2026-03-01', 'presente');
-        });
+        // --- PERIODO 2025-I (ID 2 - ACTUAL) ---
+        db.prepare("INSERT INTO periodos (id, nombre, fecha_inicio, fecha_fin, activo) VALUES (2, '2025-I', '2025-01-01', '2025-06-30', 1)").run();
+        
+        console.log('✅ Entorno de Santiago reiniciado. Ahora corre seed_santiago_real.js para cargar los datos reales.');
 
         // --- PERIODO 2025-I (ID 2 - PASADO) ---
         db.prepare("INSERT INTO periodos (id, nombre, fecha_inicio, fecha_fin, activo) VALUES (2, '2025-I', '2025-01-01', '2025-06-30', 0)").run();
@@ -327,7 +316,8 @@ router.get('/:id/schedule', auth, (req, res) => {
             LEFT JOIN salones s ON c.salon_id = s.id
             LEFT JOIN bloques b ON s.bloque_id = b.id
             LEFT JOIN sedes se ON b.sede_id = se.id
-            WHERE mat.estudiante_id = ? AND per.activo = 1
+            WHERE mat.estudiante_id = ? AND c.estado = 'activo'
+            AND per.id = (SELECT id FROM periodos WHERE activo = 1 LIMIT 1)
         `).all(studentId);
         
         res.json(schedule);
