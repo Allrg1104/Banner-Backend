@@ -56,6 +56,14 @@ function getStudentDashboardMetrics(estudianteId, periodId = null) {
     asistencia: { porcentaje: Math.round(m.asistencia_porcentaje) }
   }));
 
+  // Calculate the average for the period
+  const promediosMateria = matriculasMapped.map(m => m.promedio).filter(p => p > 0);
+  const promedio_periodo = promediosMateria.length > 0 
+    ? promediosMateria.reduce((a, b) => a + b, 0) / promediosMateria.length 
+    : 0;
+
+  resumen.promedio_periodo = promedio_periodo;
+
   return { resumen, asistencia, matriculas: matriculasMapped };
 }
 
