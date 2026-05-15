@@ -236,9 +236,13 @@ router.post('/:id/requests', auth, (req, res) => {
  */
 router.get('/courses/search', auth, (req, res) => {
     const db = getDB();
-    const query = req.query.q || '';
+    let query = req.query.q || '';
     
+    // Normalizar la consulta (quitar acentos y pasar a minúsculas)
+    const normalizedQuery = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
     try {
+        // En SQLite, usamos REPLACE para normalizar las vocales en la búsqueda
         const courses = db.prepare(`
             SELECT 
                 c.id as curso_id,
@@ -254,9 +258,13 @@ router.get('/courses/search', auth, (req, res) => {
             JOIN personas p ON c.docente_id = p.id
             JOIN periodos per ON c.periodo_id = per.id
             WHERE per.activo = 1 AND c.estado = 'activo'
-            AND (m.nombre LIKE ? OR c.nrc LIKE ?)
-            LIMIT 10
-        `).all(`%${query}%`, `%${query}%`);
+            AND (
+                LOWER(m.nombre) LIKE ? OR 
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(m.nombre), 'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u') LIKE ? OR
+                c.nrc LIKE ?
+            )
+            LIMIT 15
+        `).all(`%${query.toLowerCase()}%`, `%${normalizedQuery}%`, `%${query}%`);
         
         res.json(courses);
     } catch (err) {
