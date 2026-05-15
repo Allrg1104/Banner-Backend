@@ -228,4 +228,94 @@ router.post('/:id/requests', auth, (req, res) => {
     }
 });
 
+// --- INSCRIPCIONES ---
+
+/**
+ * Buscar cursos disponibles para inscripción en el periodo activo.
+ * Permite filtrar por nombre de materia o NRC.
+ */
+router.get('/courses/search', auth, (req, res) => {
+    const db = getDB();
+    const query = req.query.q || '';
+    
+    try {
+        const courses = db.prepare(`
+            SELECT 
+                c.id as curso_id,
+                m.nombre as materia,
+                m.codigo,
+                m.creditos,
+                c.nrc,
+                c.horario,
+                c.salon,
+                p.nombres || ' ' || p.apellidos as docente
+            FROM cursos c
+            JOIN materias m ON c.materia_id = m.id
+            JOIN personas p ON c.docente_id = p.id
+            JOIN periodos per ON c.periodo_id = per.id
+            WHERE per.activo = 1 AND c.estado = 'activo'
+            AND (m.nombre LIKE ? OR c.nrc LIKE ?)
+            LIMIT 10
+        `).all(`%${query}%`, `%${query}%`);
+        
+        res.json(courses);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * Inscribir una materia (Crear matrícula)
+ */
+router.post('/:id/enroll', auth, rbac('estudiante', 'admin'), (req, res) => {
+    const db = getDB();
+    const studentId = parseInt(req.params.id);
+    const { cursoId } = req.body;
+
+    if (!cursoId) return res.status(400).json({ error: 'Falta cursoId' });
+
+    try {
+        // Verificar si ya está matriculado
+        const exists = db.prepare('SELECT id FROM matriculas WHERE estudiante_id = ? AND curso_id = ?').get(studentId, cursoId);
+        if (exists) return res.status(400).json({ error: 'Ya estás inscrito en esta materia' });
+
+        // Verificar cruce de horario (Opcional pero recomendado para un sistema premium)
+        // Por ahora inscripción simple
+        db.prepare('INSERT INTO matriculas (estudiante_id, curso_id, estado) VALUES (?, ?, "activa")').run(studentId, cursoId);
+        
+        res.json({ success: true, message: 'Inscripción exitosa' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * Obtener el horario semanal del estudiante (Periodo activo)
+ */
+router.get('/:id/schedule', auth, (req, res) => {
+    const db = getDB();
+    const studentId = parseInt(req.params.id);
+
+    try {
+        const schedule = db.prepare(`
+            SELECT 
+                m.nombre as materia,
+                c.nrc,
+                c.horario,
+                c.salon,
+                p.nombres || ' ' || p.apellidos as docente
+            FROM matriculas mat
+            JOIN cursos c ON mat.curso_id = c.id
+            JOIN materias m ON c.materia_id = m.id
+            JOIN personas p ON c.docente_id = p.id
+            JOIN periodos per ON c.periodo_id = per.id
+            WHERE mat.estudiante_id = ? AND per.activo = 1
+        `).all(studentId);
+        
+        res.json(schedule);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
