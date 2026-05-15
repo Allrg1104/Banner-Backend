@@ -206,6 +206,32 @@ router.post('/reset-password-user', auth, rbac('registro', 'admin'), (req, res) 
     }
 });
 
+router.get('/solicitudes', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const solicitudes = db.prepare(`
+            SELECT s.*, p.nombres, p.apellidos 
+            FROM solicitudes s 
+            JOIN personas p ON s.estudiante_id = p.id
+            ORDER BY s.fecha DESC
+        `).all();
+        res.json(solicitudes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/solicitudes/:id/procesar', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        db.prepare('UPDATE solicitudes SET estado = "en_proceso", atendida_por = ? WHERE id = ?').run(req.user.id, req.params.id);
+        db.save();
+        res.json({ message: 'Solicitud en proceso' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 /**
  * Gestión Académica (Materias, Docentes, Cursos)
  */
