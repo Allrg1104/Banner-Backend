@@ -1,6 +1,7 @@
 /**
  * Script de Sincronización Real para Santiago Espinosa
  * Setea las 6 materias oficiales del horario y asigna al profesor Arangel.
+ * CORRECCIÓN: Usa UPDATE si el NRC ya existe para no romper las matrículas.
  */
 const { initDB } = require('./db');
 const bcrypt = require('bcryptjs');
@@ -20,25 +21,19 @@ async function syncRealData() {
                 VALUES ("Arangel", "Docente", "arangel@unicatolica.edu.co", "arangel", ?, "docente", "80000001", 0)
             `).run(hash);
             arangel = db.prepare('SELECT id FROM personas WHERE username = "arangel"').get();
-            
             db.prepare('INSERT INTO docentes (persona_id, departamento, titulo) VALUES (?, "Sistemas", "Ingeniero de Sistemas")').run(arangel.id);
         }
 
-        // 2. Obtener el ID de Santiago
         const santiago = db.prepare('SELECT id FROM personas WHERE username = "santiago.espinosa01"').get();
         if (!santiago) throw new Error('No se encontró al estudiante Santiago');
 
-        // 3. Asegurar que el periodo 2 esté activo
         db.prepare('UPDATE periodos SET activo = 0').run();
         db.prepare('UPDATE periodos SET activo = 1 WHERE id = 2').run();
 
-        // 4. Limpiar matrículas previas de Santiago para el periodo actual (ID 2)
-        console.log('🧹 Limpiando materias de prueba...');
-        db.prepare('DELETE FROM asistencia WHERE matricula_id IN (SELECT id FROM matriculas WHERE estudiante_id = ? AND curso_id IN (SELECT id FROM cursos WHERE periodo_id = 2))').run(santiago.id);
-        db.prepare('DELETE FROM calificaciones WHERE matricula_id IN (SELECT id FROM matriculas WHERE estudiante_id = ? AND curso_id IN (SELECT id FROM cursos WHERE periodo_id = 2))').run(santiago.id);
-        db.prepare('DELETE FROM matriculas WHERE estudiante_id = ? AND curso_id IN (SELECT id FROM cursos WHERE periodo_id = 2)').run(santiago.id);
+        // 2. Limpiar matrículas "huérfanas" o erróneas de Santiago para el periodo actual
+        console.log('🧹 Limpiando inscripciones erróneas...');
+        db.prepare('DELETE FROM matriculas WHERE estudiante_id = ? AND curso_id NOT IN (SELECT id FROM cursos WHERE nrc IN ("13424", "13425", "13776", "13816", "14041", "14273"))').run(santiago.id);
 
-        // 5. Crear las materias reales y sus cursos (SIN SALÓN, CON HORARIO REAL)
         const materiasReales = [
             { nombre: 'Gestión de Servicios en TIC', codigo: 'DPCI-23073', creditos: 3, nrc: '13424', horario: 'Lun-Mié 18:30-21:30' },
             { nombre: 'Metodologías Ágiles en Software', codigo: 'DPCI-23105', creditos: 3, nrc: '13425', horario: 'Mar-Jue 18:30-21:30' },
@@ -48,26 +43,32 @@ async function syncRealData() {
             { nombre: 'Electiva de Profundización II', codigo: 'DPCI-23036', creditos: 3, nrc: '14273', horario: 'Mar-Jue 18:30-21:30' }
         ];
 
-        console.log('📚 Registrando asignaturas oficiales...');
+        console.log('📚 Sincronizando asignaturas oficiales (manteniendo IDs)...');
         for (const m of materiasReales) {
-            // Crear materia si no existe
             db.prepare('INSERT OR IGNORE INTO materias (nombre, codigo, creditos, programa_id) VALUES (?, ?, ?, 1)').run(m.nombre, m.codigo, m.creditos);
             const materiaId = db.prepare('SELECT id FROM materias WHERE codigo = ?').get(m.codigo).id;
 
-            // Insertar o actualizar curso (Mantenemos horario, quitamos salón)
-            db.prepare(`
-                INSERT OR REPLACE INTO cursos (materia_id, docente_id, periodo_id, nrc, horario, salon, estado) 
-                VALUES (?, ?, 2, ?, ?, NULL, 'activo')
-            `).run(materiaId, arangel.id, m.nrc, m.horario);
+            // Verificar si el curso ya existe para NO usar REPLACE
+            const existingCourse = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND periodo_id = 2').get(m.nrc);
             
-            const cursoId = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND periodo_id = 2').get(m.nrc).id;
+            let cursoId;
+            if (existingCourse) {
+                // Solo actualizar horario (no tocamos salón ni ID)
+                db.prepare('UPDATE cursos SET horario = ?, materia_id = ?, docente_id = ? WHERE id = ?').run(m.horario, materiaId, arangel.id, existingCourse.id);
+                cursoId = existingCourse.id;
+            } else {
+                // Crear nuevo
+                const res = db.prepare('INSERT INTO cursos (materia_id, docente_id, periodo_id, nrc, horario, estado) VALUES (?, ?, 2, ?, ?, "activo")')
+                    .run(materiaId, arangel.id, m.nrc, m.horario);
+                cursoId = res.lastInsertRowid;
+            }
 
-            // Matricular a Santiago
+            // Asegurar matrícula
             db.prepare('INSERT OR IGNORE INTO matriculas (estudiante_id, curso_id, estado) VALUES (?, ?, "activa")').run(santiago.id, cursoId);
         }
 
         db.save();
-        console.log('✅ Sincronización exitosa. Santiago tiene 16 créditos con el profesor Arangel (Salones por asignar).');
+        console.log('✅ Sincronización completada con éxito.');
         process.exit(0);
     } catch (error) {
         console.error('❌ Error:', error.message);

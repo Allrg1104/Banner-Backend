@@ -251,12 +251,17 @@ router.get('/courses/search', auth, (req, res) => {
                 m.creditos,
                 c.nrc,
                 c.horario,
-                c.salon,
+                COALESCE(s.nombre, c.salon) as salon,
+                b.nombre as bloque,
+                se.nombre as sede,
                 p.nombres || ' ' || p.apellidos as docente
             FROM cursos c
             JOIN materias m ON c.materia_id = m.id
             JOIN personas p ON c.docente_id = p.id
             JOIN periodos per ON c.periodo_id = per.id
+            LEFT JOIN salones s ON c.salon_id = s.id
+            LEFT JOIN bloques b ON s.bloque_id = b.id
+            LEFT JOIN sedes se ON b.sede_id = se.id
             WHERE per.activo = 1 AND c.estado = 'activo'
             AND (
                 LOWER(m.nombre) LIKE ? OR 
@@ -310,13 +315,18 @@ router.get('/:id/schedule', auth, (req, res) => {
                 m.nombre as materia,
                 c.nrc,
                 c.horario,
-                c.salon,
+                COALESCE(s.nombre, c.salon) as salon,
+                b.nombre as bloque,
+                se.nombre as sede,
                 p.nombres || ' ' || p.apellidos as docente
             FROM matriculas mat
             JOIN cursos c ON mat.curso_id = c.id
             JOIN materias m ON c.materia_id = m.id
             JOIN personas p ON c.docente_id = p.id
             JOIN periodos per ON c.periodo_id = per.id
+            LEFT JOIN salones s ON c.salon_id = s.id
+            LEFT JOIN bloques b ON s.bloque_id = b.id
+            LEFT JOIN sedes se ON b.sede_id = se.id
             WHERE mat.estudiante_id = ? AND per.activo = 1
         `).all(studentId);
         
