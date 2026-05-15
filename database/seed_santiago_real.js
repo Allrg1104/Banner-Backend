@@ -38,19 +38,14 @@ async function syncRealData() {
         db.prepare('DELETE FROM calificaciones WHERE matricula_id IN (SELECT id FROM matriculas WHERE estudiante_id = ? AND curso_id IN (SELECT id FROM cursos WHERE periodo_id = 2))').run(santiago.id);
         db.prepare('DELETE FROM matriculas WHERE estudiante_id = ? AND curso_id IN (SELECT id FROM cursos WHERE periodo_id = 2)').run(santiago.id);
 
-        // 5. Crear las materias reales y sus cursos
+        // 5. Crear las materias reales y sus cursos (SIN SALÓN, CON HORARIO REAL)
         const materiasReales = [
-            { nombre: 'Gestión de Servicios en TIC', codigo: 'DPCI-23073', creditos: 3, nrc: '13424', horario: 'Lun-Mié 18:30-21:30', salon: 'A-101' },
-            { nombre: 'Metodologías Ágiles en Software', codigo: 'DPCI-23105', creditos: 3, nrc: '13425', horario: 'Mar-Jue 18:30-21:30', salon: 'A-102' },
-            { nombre: 'Electiva de Formación Social II', codigo: 'DPCS-32139', creditos: 2, nrc: '13776', horario: 'Vie 18:30-21:30', salon: 'A-201' },
-            { nombre: 'Trabajo de Grado I', codigo: 'DPCI-22153', creditos: 2, nrc: '13816', horario: 'Sáb 06:30-09:30', salon: 'Sistemas 1' },
-            { nombre: 'Electiva de Profundización IV', codigo: 'DPCI-23038', creditos: 3, nrc: '14041', horario: 'Lun-Mié 18:30-21:30', salon: 'B-101' },
-            { nombre: 'Gestión de Servicios en TIC', codigo: 'DPCI-23073', creditos: 3, nrc: '13424', horario: 'Lun-Mié 18:30-21:30', salon: null },
-            { nombre: 'Metodologías Ágiles en Software', codigo: 'DPCI-23105', creditos: 3, nrc: '13425', horario: 'Mar-Jue 18:30-21:30', salon: null },
-            { nombre: 'Electiva de Formación Social II', codigo: 'DPCS-32139', creditos: 2, nrc: '13776', horario: 'Vie 18:30-21:30', salon: null },
-            { nombre: 'Trabajo de Grado I', codigo: 'DPCI-22153', creditos: 2, nrc: '13816', horario: 'Sáb 06:30-09:30', salon: null },
-            { nombre: 'Electiva de Profundización IV', codigo: 'DPCI-23038', creditos: 3, nrc: '14041', horario: 'Lun-Mié 18:30-21:30', salon: null },
-            { nombre: 'Electiva de Profundización II', codigo: 'DPCI-23036', creditos: 3, nrc: '14273', horario: 'Mar-Jue 18:30-21:30', salon: null }
+            { nombre: 'Gestión de Servicios en TIC', codigo: 'DPCI-23073', creditos: 3, nrc: '13424', horario: 'Lun-Mié 18:30-21:30' },
+            { nombre: 'Metodologías Ágiles en Software', codigo: 'DPCI-23105', creditos: 3, nrc: '13425', horario: 'Mar-Jue 18:30-21:30' },
+            { nombre: 'Electiva de Formación Social II', codigo: 'DPCS-32139', creditos: 2, nrc: '13776', horario: 'Vie 18:30-21:30' },
+            { nombre: 'Trabajo de Grado I', codigo: 'DPCI-22153', creditos: 2, nrc: '13816', horario: 'Sáb 06:30-09:30' },
+            { nombre: 'Electiva de Profundización IV', codigo: 'DPCI-23038', creditos: 3, nrc: '14041', horario: 'Lun-Mié 18:30-21:30' },
+            { nombre: 'Electiva de Profundización II', codigo: 'DPCI-23036', creditos: 3, nrc: '14273', horario: 'Mar-Jue 18:30-21:30' }
         ];
 
         console.log('📚 Registrando asignaturas oficiales...');
@@ -59,18 +54,20 @@ async function syncRealData() {
             db.prepare('INSERT OR IGNORE INTO materias (nombre, codigo, creditos, programa_id) VALUES (?, ?, ?, 1)').run(m.nombre, m.codigo, m.creditos);
             const materiaId = db.prepare('SELECT id FROM materias WHERE codigo = ?').get(m.codigo).id;
 
-            // Crear curso sin salón (Asegurando horario)
-            db.prepare('INSERT OR REPLACE INTO cursos (materia_id, docente_id, periodo_id, nrc, horario, salon, estado) VALUES (?, ?, 2, ?, ?, NULL, "activo")')
-                .run(materiaId, arangel.id, m.nrc, m.horario);
+            // Insertar o actualizar curso (Mantenemos horario, quitamos salón)
+            db.prepare(`
+                INSERT OR REPLACE INTO cursos (materia_id, docente_id, periodo_id, nrc, horario, salon, estado) 
+                VALUES (?, ?, 2, ?, ?, NULL, 'activo')
+            `).run(materiaId, arangel.id, m.nrc, m.horario);
             
             const cursoId = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND periodo_id = 2').get(m.nrc).id;
 
             // Matricular a Santiago
-            db.prepare('INSERT INTO matriculas (estudiante_id, curso_id, estado) VALUES (?, ?, "activa")').run(santiago.id, cursoId);
+            db.prepare('INSERT OR IGNORE INTO matriculas (estudiante_id, curso_id, estado) VALUES (?, ?, "activa")').run(santiago.id, cursoId);
         }
 
         db.save();
-        console.log('✅ Sincronización exitosa. Santiago tiene 16 créditos con el profesor Arangel.');
+        console.log('✅ Sincronización exitosa. Santiago tiene 16 créditos con el profesor Arangel (Salones por asignar).');
         process.exit(0);
     } catch (error) {
         console.error('❌ Error:', error.message);
