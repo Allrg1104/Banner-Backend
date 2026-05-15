@@ -38,6 +38,7 @@ function getStudentDashboardMetrics(estudianteId, periodId = null) {
         m.id as matricula_id, 
         mat.nombre as materia, 
         mat.codigo,
+        mat.creditos,
         c.nrc, 
         p_doc.nombres || ' ' || p_doc.apellidos as docente,
         COALESCE((SELECT AVG(valor) FROM calificaciones WHERE matricula_id = m.id AND valor IS NOT NULL), 0) as promedio,
@@ -71,6 +72,9 @@ function getStudentDashboardMetrics(estudianteId, periodId = null) {
     : 0;
 
   resumen.promedio_periodo = promedio_periodo;
+
+  // Sum real credits from the subjects
+  resumen.creditos_periodo = matriculas.reduce((acc, m) => acc + (m.creditos || 0), 0);
 
   return { resumen, asistencia, matriculas: matriculasMapped };
 }
