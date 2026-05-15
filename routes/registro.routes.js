@@ -64,6 +64,36 @@ router.put('/users/:id', auth, rbac('registro', 'admin'), (req, res) => {
     res.json({ message: 'Usuario actualizado' });
 });
 
+router.get('/sedes', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const sedes = db.prepare('SELECT * FROM sedes').all();
+        res.json(sedes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/sedes/:sede_id/bloques', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const bloques = db.prepare('SELECT b.*, (SELECT COUNT(*) FROM salones s WHERE s.bloque_id = b.id) as total_salones FROM bloques b WHERE b.sede_id = ?').all(req.params.sede_id);
+        res.json(bloques);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/bloques/:bloque_id/salones', auth, rbac('registro', 'admin'), (req, res) => {
+    const db = getDB();
+    try {
+        const salones = db.prepare('SELECT * FROM salones WHERE bloque_id = ?').all(req.params.bloque_id);
+        res.json(salones);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/salones/estructura', auth, rbac('registro', 'admin'), (req, res) => {
     const db = getDB();
     try {
