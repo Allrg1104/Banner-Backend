@@ -155,7 +155,10 @@ router.post('/salones/asignar', auth, rbac('registro', 'admin'), (req, res) => {
             return res.status(400).json({ error: 'El salón ya está ocupado en ese horario.' });
         }
 
-        db.prepare('UPDATE cursos SET salon_id = ?, horario = ? WHERE id = ?').run(salon_id, horario, curso_id);
+        const salon = db.prepare('SELECT nombre FROM salones WHERE id = ?').get(salon_id);
+        if (!salon) return res.status(404).json({ error: 'Salón no existe' });
+
+        db.prepare('UPDATE cursos SET salon_id = ?, salon = ?, horario = ? WHERE id = ?').run(salon_id, salon.nombre, horario, curso_id);
         db.save();
         res.json({ message: 'Asignación guardada correctamente' });
     } catch (err) {

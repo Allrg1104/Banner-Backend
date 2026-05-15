@@ -45,7 +45,12 @@ async function syncRealData() {
             { nombre: 'Electiva de Formación Social II', codigo: 'DPCS-32139', creditos: 2, nrc: '13776', horario: 'Vie 18:30-21:30', salon: 'A-201' },
             { nombre: 'Trabajo de Grado I', codigo: 'DPCI-22153', creditos: 2, nrc: '13816', horario: 'Sáb 06:30-09:30', salon: 'Sistemas 1' },
             { nombre: 'Electiva de Profundización IV', codigo: 'DPCI-23038', creditos: 3, nrc: '14041', horario: 'Lun-Mié 18:30-21:30', salon: 'B-101' },
-            { nombre: 'Electiva de Profundización II', codigo: 'DPCI-23036', creditos: 3, nrc: '14273', horario: 'Mar-Jue 18:30-21:30', salon: 'B-102' }
+            { nombre: 'Gestión de Servicios en TIC', codigo: 'DPCI-23073', creditos: 3, nrc: '13424', horario: 'Lun-Mié 18:30-21:30', salon: null },
+            { nombre: 'Metodologías Ágiles en Software', codigo: 'DPCI-23105', creditos: 3, nrc: '13425', horario: 'Mar-Jue 18:30-21:30', salon: null },
+            { nombre: 'Electiva de Formación Social II', codigo: 'DPCS-32139', creditos: 2, nrc: '13776', horario: 'Vie 18:30-21:30', salon: null },
+            { nombre: 'Trabajo de Grado I', codigo: 'DPCI-22153', creditos: 2, nrc: '13816', horario: 'Sáb 06:30-09:30', salon: null },
+            { nombre: 'Electiva de Profundización IV', codigo: 'DPCI-23038', creditos: 3, nrc: '14041', horario: 'Lun-Mié 18:30-21:30', salon: null },
+            { nombre: 'Electiva de Profundización II', codigo: 'DPCI-23036', creditos: 3, nrc: '14273', horario: 'Mar-Jue 18:30-21:30', salon: null }
         ];
 
         console.log('📚 Registrando asignaturas oficiales...');
@@ -54,9 +59,9 @@ async function syncRealData() {
             db.prepare('INSERT OR IGNORE INTO materias (nombre, codigo, creditos, programa_id) VALUES (?, ?, ?, 1)').run(m.nombre, m.codigo, m.creditos);
             const materiaId = db.prepare('SELECT id FROM materias WHERE codigo = ?').get(m.codigo).id;
 
-            // Crear curso si no existe para este periodo y NRC (Asegurando horario y salon)
-            db.prepare('INSERT OR REPLACE INTO cursos (materia_id, docente_id, periodo_id, nrc, horario, salon, estado) VALUES (?, ?, 2, ?, ?, ?, "activo")')
-                .run(materiaId, arangel.id, m.nrc, m.horario, m.salon);
+            // Crear curso sin salón (Asegurando horario)
+            db.prepare('INSERT OR REPLACE INTO cursos (materia_id, docente_id, periodo_id, nrc, horario, salon, estado) VALUES (?, ?, 2, ?, ?, NULL, "activo")')
+                .run(materiaId, arangel.id, m.nrc, m.horario);
             
             const cursoId = db.prepare('SELECT id FROM cursos WHERE nrc = ? AND periodo_id = 2').get(m.nrc).id;
 

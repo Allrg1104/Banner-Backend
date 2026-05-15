@@ -12,17 +12,17 @@ async function seedAvailable() {
         if (!activePeriod) throw new Error('No hay un periodo activo.');
 
         const oferta = [
-            { nombre: 'Cálculo Diferencial', nrc: '20001', horario: 'Lun-Mié 18:30-21:30', salon: 'P-101', docente: 2 },
-            { nombre: 'Cálculo Integral', nrc: '20002', horario: 'Mar-Jue 18:30-21:30', salon: 'P-102', docente: 7 },
-            { nombre: 'Cálculo Vectorial', nrc: '20003', horario: 'Vie 18:30-21:30', salon: 'P-103', docente: 2 },
-            { nombre: 'Física Mecánica', nrc: '30001', horario: 'Lun-Mié 18:30-21:30', salon: 'L-201', docente: 7 },
-            { nombre: 'Programación Orientada a Objetos', nrc: '40001', horario: 'Mar-Jue 18:30-21:30', salon: 'S-301', docente: 2 },
-            { nombre: 'Bases de Datos II', nrc: '40002', horario: 'Sáb 18:30-21:30', salon: 'S-302', docente: 7 },
-            { nombre: 'Inglés I', nrc: '50001', horario: 'Lun-Mié 18:30-21:30', salon: 'I-101', docente: 2 },
-            { nombre: 'Inglés II', nrc: '50002', horario: 'Mar-Jue 18:30-21:30', salon: 'I-102', docente: 7 },
-            { nombre: 'Inglés III', nrc: '50003', horario: 'Vie 18:30-21:30', salon: 'I-103', docente: 2 },
-            { nombre: 'Inglés IV', nrc: '50004', horario: 'Sáb 18:30-21:30', salon: 'I-104', docente: 7 },
-            { nombre: 'Inglés V', nrc: '50005', horario: 'Lun-Mié 18:30-21:30', salon: 'I-105', docente: 2 }
+            { nombre: 'Cálculo Diferencial', nrc: '20001', horario: 'Lun-Mié 18:30-21:30', salon: null, docente: 2 },
+            { nombre: 'Cálculo Integral', nrc: '20002', horario: 'Mar-Jue 18:30-21:30', salon: null, docente: 7 },
+            { nombre: 'Cálculo Vectorial', nrc: '20003', horario: 'Vie 18:30-21:30', salon: null, docente: 2 },
+            { nombre: 'Física Mecánica', nrc: '30001', horario: 'Lun-Mié 18:30-21:30', salon: null, docente: 7 },
+            { nombre: 'Programación Orientada a Objetos', nrc: '40001', horario: 'Mar-Jue 18:30-21:30', salon: null, docente: 2 },
+            { nombre: 'Bases de Datos II', nrc: '40002', horario: 'Sáb 18:30-21:30', salon: null, docente: 7 },
+            { nombre: 'Inglés I', nrc: '50001', horario: 'Lun-Mié 18:30-21:30', salon: null, docente: 2 },
+            { nombre: 'Inglés II', nrc: '50002', horario: 'Mar-Jue 18:30-21:30', salon: null, docente: 7 },
+            { nombre: 'Inglés III', nrc: '50003', horario: 'Vie 18:30-21:30', salon: null, docente: 2 },
+            { nombre: 'Inglés IV', nrc: '50004', horario: 'Sáb 18:30-21:30', salon: null, docente: 7 },
+            { nombre: 'Inglés V', nrc: '50005', horario: 'Lun-Mié 18:30-21:30', salon: null, docente: 2 }
         ];
 
         for (const o of oferta) {
